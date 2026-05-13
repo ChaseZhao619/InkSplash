@@ -1,6 +1,6 @@
 # ESP32-C3 配网与 InkSplash App 对接说明
 
-本文档给负责 ESP32 固件的同事使用，目标是让 ESP32-C3 设备可以通过 InkSplash App 完成 BLE 配网、云端绑定、图片拉取和状态上报。
+本文档给负责 ESP32 固件使用，目标是让 ESP32-C3 设备可以通过 InkSplash App 完成 BLE 配网、云端绑定、图片拉取和状态上报。
 
 ## 目标流程
 
