@@ -1,0 +1,98 @@
+PODS:
+  - DKImagePickerController/Core (4.3.9):
+    - DKImagePickerController/ImageDataManager
+    - DKImagePickerController/Resource
+  - DKImagePickerController/ImageDataManager (4.3.9)
+  - DKImagePickerController/PhotoGallery (4.3.9):
+    - DKImagePickerController/Core
+    - DKPhotoGallery
+  - DKImagePickerController/Resource (4.3.9)
+  - DKPhotoGallery (0.0.19):
+    - DKPhotoGallery/Core (= 0.0.19)
+    - DKPhotoGallery/Model (= 0.0.19)
+    - DKPhotoGallery/Preview (= 0.0.19)
+    - DKPhotoGallery/Resource (= 0.0.19)
+    - SDWebImage
+    - SwiftyGif
+  - DKPhotoGallery/Core (0.0.19):
+    - DKPhotoGallery/Model
+    - DKPhotoGallery/Preview
+    - SDWebImage
+    - SwiftyGif
+  - DKPhotoGallery/Model (0.0.19):
+    - SDWebImage
+    - SwiftyGif
+  - DKPhotoGallery/Preview (0.0.19):
+    - DKPhotoGallery/Model
+    - DKPhotoGallery/Resource
+    - SDWebImage
+    - SwiftyGif
+  - DKPhotoGallery/Resource (0.0.19):
+    - SDWebImage
+    - SwiftyGif
+  - ESPProvision (3.1.0):
+    - ESPProvision/Core (= 3.1.0)
+  - ESPProvision/Core (3.1.0):
+    - SwiftProtobuf (~> 1.22.0)
+  - file_picker (0.0.1):
+    - DKImagePickerController/PhotoGallery
+    - Flutter
+  - Flutter (1.0.0)
+  - mobile_scanner (7.0.0):
+    - Flutter
+    - FlutterMacOS
+  - SDWebImage (5.21.7):
+    - SDWebImage/Core (= 5.21.7)
+  - SDWebImage/Core (5.21.7)
+  - SwiftProtobuf (1.22.1)
+  - SwiftyGif (5.4.5)
+
+DEPENDENCIES:
+  - ESPProvision (from `https://github.com/espressif/esp-idf-provisioning-ios.git`)
+  - file_picker (from `.symlinks/plugins/file_picker/ios`)
+  - Flutter (from `Flutter`)
+  - mobile_scanner (from `.symlinks/plugins/mobile_scanner/darwin`)
+  - SwiftProtobuf (from `https://github.com/apple/swift-protobuf.git`, tag `1.22.1`)
+
+SPEC REPOS:
+  https://github.com/CocoaPods/Specs.git:
+    - DKImagePickerController
+    - DKPhotoGallery
+    - SDWebImage
+    - SwiftyGif
+
+EXTERNAL SOURCES:
+  ESPProvision:
+    :git: https://github.com/espressif/esp-idf-provisioning-ios.git
+  file_picker:
+    :path: ".symlinks/plugins/file_picker/ios"
+  Flutter:
+    :path: Flutter
+  mobile_scanner:
+    :path: ".symlinks/plugins/mobile_scanner/darwin"
+  SwiftProtobuf:
+    :git: https://github.com/apple/swift-protobuf.git
+    :tag: 1.22.1
+
+CHECKOUT OPTIONS:
+  ESPProvision:
+    :commit: 00a33ce4ccf79168a6cfd9d1d6cdc924d0101613
+    :git: https://github.com/espressif/esp-idf-provisioning-ios.git
+  SwiftProtobuf:
+    :git: https://github.com/apple/swift-protobuf.git
+    :tag: 1.22.1
+
+SPEC CHECKSUMS:
+  DKImagePickerController: 946cec48c7873164274ecc4624d19e3da4c1ef3c
+  DKPhotoGallery: b3834fecb755ee09a593d7c9e389d8b5d6deed60
+  ESPProvision: a24f5156726f9dd4444f856cbed895a7af50aaf9
+  file_picker: a0560bc09d61de87f12d246fc47d2119e6ef37be
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  mobile_scanner: 9157936403f5a0644ca3779a38ff8404c5434a93
+  SDWebImage: e9fc87c1aab89a8ab1bbd74eba378c6f53be8abf
+  SwiftProtobuf: 7773c4e96a99d7b8ab7cda0fc30a883732ff93b1
+  SwiftyGif: 706c60cf65fa2bc5ee0313beece843c8eb8194d4
+
+PODFILE CHECKSUM: b1d1308201e49a4dc8e4d39e99fa20358f9b7b17
+
+COCOAPODS: 1.16.2
