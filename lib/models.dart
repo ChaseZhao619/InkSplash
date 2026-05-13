@@ -76,9 +76,24 @@ class ProvisioningQrPayload {
   }
 
   factory ProvisioningQrPayload.fromRaw(String raw) {
-    final decoded = jsonDecode(raw);
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(raw);
+    } catch (_) {
+      throw const FormatException('二维码内容不是有效 JSON');
+    }
     if (decoded is! Map<String, dynamic>) {
-      throw const FormatException('QR payload must be a JSON object');
+      throw const FormatException('二维码内容必须是 JSON 对象');
+    }
+    final missing = <String>[
+      if (_string(decoded['ver']).isEmpty) 'ver',
+      if (_string(decoded['name']).isEmpty) 'name',
+      if (_string(decoded['pop']).isEmpty) 'pop',
+      if (_string(decoded['device_id']).isEmpty) 'device_id',
+      if (_string(decoded['claim_code']).isEmpty) 'claim_code',
+    ];
+    if (missing.isNotEmpty) {
+      throw FormatException('二维码缺少字段：${missing.join(', ')}');
     }
     final payload = ProvisioningQrPayload(
       version: _string(decoded['ver']),
@@ -90,20 +105,17 @@ class ProvisioningQrPayload {
       claimCode: _string(decoded['claim_code']),
     );
     if (payload.version != 'v1') {
-      throw const FormatException('Unsupported QR version');
+      throw FormatException('不支持的二维码版本：${payload.version}');
     }
     if (payload.transport != 'ble') {
-      throw const FormatException('Only BLE provisioning is supported in V1');
-    }
-    if (payload.security != 1) {
-      throw const FormatException(
-        'Only Security 1 provisioning is supported in V1',
+      throw FormatException(
+        '当前 App 只支持 BLE 配网二维码，不支持 ${payload.transport.isEmpty ? '空 transport' : payload.transport}',
       );
     }
-    if (payload.name.isEmpty ||
-        payload.deviceId.isEmpty ||
-        payload.claimCode.isEmpty) {
-      throw const FormatException('QR payload is missing required fields');
+    if (payload.security != 1) {
+      throw FormatException(
+        '当前 App 只支持 Security 1，不支持 Security ${payload.security}',
+      );
     }
     return payload;
   }

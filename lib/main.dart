@@ -148,14 +148,16 @@ class _AppShellState extends State<AppShell> {
       return;
     }
     try {
+      final payload = ProvisioningQrPayload.fromRaw(raw);
       setState(() {
-        _qrPayload = ProvisioningQrPayload.fromRaw(raw);
+        _qrPayload = payload;
         _provisioningDevices = const [];
         _wifiNetworks = const [];
         _selectedWifi = null;
       });
     } catch (error) {
-      setState(() => _message = 'Invalid QR payload: $error');
+      final message = error is FormatException ? error.message : '$error';
+      setState(() => _message = 'Invalid QR payload: $message');
     }
   }
 
@@ -584,18 +586,38 @@ class _AppShellState extends State<AppShell> {
   }
 }
 
-class QrScannerPage extends StatelessWidget {
+class QrScannerPage extends StatefulWidget {
   const QrScannerPage({super.key});
+
+  @override
+  State<QrScannerPage> createState() => _QrScannerPageState();
+}
+
+class _QrScannerPageState extends State<QrScannerPage> {
+  final MobileScannerController _controller = MobileScannerController();
+  bool _handled = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Scan device QR')),
       body: MobileScanner(
+        controller: _controller,
         onDetect: (capture) {
+          if (_handled) {
+            return;
+          }
           final raw = capture.barcodes.firstOrNull?.rawValue;
           if (raw != null && raw.isNotEmpty) {
-            Navigator.of(context).pop(raw);
+            _handled = true;
+            _controller.stop();
+            Navigator.of(context).maybePop(raw);
           }
         },
       ),
