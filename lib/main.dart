@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' hide ImageInfo;
+import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'models.dart';
@@ -104,6 +104,12 @@ class _AppShellState extends State<AppShell> {
     await _run(register ? 'Register' : 'Login', () async {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
+      if (email.length < 3) {
+        throw const ApiError('Please enter your email.');
+      }
+      if (password.length < 8) {
+        throw const ApiError('Password must be at least 8 characters.');
+      }
       final session = register
           ? await _auth.register(email: email, password: password)
           : await _auth.login(email: email, password: password);
@@ -212,25 +218,20 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _uploadAndAssign() async {
-    final token = _requireLogin();
-    final device = _selectedDevice;
-    if (device == null) {
-      throw const ApiError('Select or bind a device first');
-    }
     await _run('Upload and assign', () async {
-      final selected = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png', 'bmp', 'webp', 'dng', 'DNG'],
-        allowMultiple: false,
-      );
-      final file = selected?.files.single;
-      if (file == null || file.path == null) {
+      final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (picked == null) {
         return;
+      }
+      final token = _requireLogin();
+      final device = _selectedDevice;
+      if (device == null) {
+        throw const ApiError('Select or bind a device first.');
       }
       final image = await _imageService.uploadImage(
         bearerToken: token,
-        filePath: file.path!,
-        fileName: file.name,
+        filePath: picked.path,
+        fileName: picked.name,
         options: UploadOptions(
           direction: _direction,
           mode: _mode,
@@ -293,25 +294,26 @@ class _AppShellState extends State<AppShell> {
         ),
         body: AbsorbPointer(
           absorbing: _busy,
-          child: ListView(
+          child: Padding(
             padding: const EdgeInsets.all(16),
-            children: [
-              _ConnectionPanel(controller: _baseUrlController, busy: _busy),
-              const SizedBox(height: 12),
-              if (_message != null) _MessageBanner(message: _message!),
-              if (_busy) const LinearProgressIndicator(),
-              SizedBox(
-                height: MediaQuery.of(context).size.height - 220,
-                child: TabBarView(
-                  children: [
-                    _accountTab(),
-                    _devicesTab(),
-                    _bindTab(),
-                    _uploadTab(),
-                  ],
+            child: Column(
+              children: [
+                _ConnectionPanel(controller: _baseUrlController, busy: _busy),
+                const SizedBox(height: 12),
+                if (_message != null) _MessageBanner(message: _message!),
+                if (_busy) const LinearProgressIndicator(),
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      _accountTab(),
+                      _devicesTab(),
+                      _bindTab(),
+                      _uploadTab(),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -123,7 +123,7 @@ class EpaperApiClient {
     try {
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       if (decoded is Map && decoded['detail'] != null) {
-        message = '${decoded['detail']}';
+        message = _formatDetail(decoded['detail']);
       }
     } catch (_) {
       if (response.body.isNotEmpty) {
@@ -139,5 +139,36 @@ class EpaperApiClient {
       return 'http://47.113.120.232/';
     }
     return trimmed.endsWith('/') ? trimmed : '$trimmed/';
+  }
+
+  static String _formatDetail(Object? detail) {
+    if (detail is String) {
+      return detail;
+    }
+    if (detail is List) {
+      final messages = detail
+          .map(_formatValidationItem)
+          .where((item) => item.isNotEmpty)
+          .toList();
+      if (messages.isNotEmpty) {
+        return messages.join('; ');
+      }
+    }
+    return '$detail';
+  }
+
+  static String _formatValidationItem(Object? item) {
+    if (item is! Map) {
+      return '$item';
+    }
+    final msg = item['msg']?.toString() ?? 'Invalid value';
+    final loc = item['loc'];
+    if (loc is List && loc.isNotEmpty) {
+      final field = loc.where((part) => part != 'body').join('.');
+      if (field.isNotEmpty) {
+        return '$field: $msg';
+      }
+    }
+    return msg;
   }
 }
