@@ -20,8 +20,9 @@ class AppStrings {
   String get settings => isZh ? '设置' : 'Settings';
   String get account => isZh ? '账号' : 'Account';
   String get upload => isZh ? '上传' : 'Upload';
-  String get galleryTone =>
-      isZh ? '安静地把画面送到墨水屏' : 'Quiet image delivery for e-paper';
+  String get galleryTone => isZh
+      ? '安静地把画面送到墨水屏。泽鑫请勿偷懒。'
+      : 'Quiet image delivery for e-paper. Zexin, please do not slack off.';
   String get welcomeBack => isZh ? '欢迎回来' : 'Welcome back';
   String get signInSubtitle =>
       isZh ? '登录后管理你的墨水屏和共享设备。' : 'Sign in to manage your e-paper displays.';

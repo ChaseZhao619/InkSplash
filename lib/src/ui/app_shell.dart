@@ -381,6 +381,7 @@ class _HomePage extends StatelessWidget {
         ),
         if (controller.latestImage != null)
           _ImageMetaPanel(image: controller.latestImage!),
+        _SharingEntryPanel(controller: controller),
         _Panel(
           title: s.deviceOverview,
           child: device == null
@@ -478,22 +479,7 @@ class _DevicesPage extends StatelessWidget {
               ],
             ),
           ),
-        if (selected != null)
-          _Panel(
-            title: s.shareMembers,
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.group_outlined),
-              title: Text(s.manageSharing),
-              subtitle: Text(s.groups),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => _SharingPage(controller: controller),
-                ),
-              ),
-            ),
-          ),
+        _SharingEntryPanel(controller: controller),
         if (selected != null)
           _Panel(
             title: s.recentStatus,
@@ -521,6 +507,32 @@ class _DevicesPage extends StatelessWidget {
                   ),
           ),
       ],
+    );
+  }
+}
+
+class _SharingEntryPanel extends StatelessWidget {
+  const _SharingEntryPanel({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    return _Panel(
+      title: s.groups,
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.group_outlined),
+        title: Text(s.manageSharing),
+        subtitle: Text(s.shareMembers),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => _SharingPage(controller: controller),
+          ),
+        ),
+      ),
     );
   }
 }
