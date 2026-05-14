@@ -92,7 +92,7 @@ class AppController extends ChangeNotifier {
         user: user,
       );
       devices = loadedDevices;
-      await _refreshGroupsWithToken(stored.accessToken);
+      await _tryRefreshGroupsWithToken(stored.accessToken);
       selectedDevice = loadedDevices.isEmpty ? null : loadedDevices.first;
       renameController.text = selectedDevice?.nickname ?? '';
     } catch (error) {
@@ -148,7 +148,7 @@ class AppController extends ChangeNotifier {
       );
       session = nextSession;
       devices = loadedDevices;
-      await _refreshGroupsWithToken(nextSession.accessToken);
+      await _tryRefreshGroupsWithToken(nextSession.accessToken);
       selectedDevice = loadedDevices.isEmpty ? null : loadedDevices.first;
       renameController.text = selectedDevice?.nickname ?? '';
     });
@@ -617,6 +617,17 @@ class AppController extends ChangeNotifier {
       (group) => group.groupId == preferred,
       orElse: () => loadedGroups.first,
     );
+  }
+
+  Future<void> _tryRefreshGroupsWithToken(String token) async {
+    try {
+      await _refreshGroupsWithToken(token);
+    } catch (_) {
+      groups = const [];
+      selectedGroup = null;
+      groupMembers = const [];
+      groupDevices = const [];
+    }
   }
 
   Future<void> _refreshGroupDetailWithToken(
