@@ -502,32 +502,67 @@ class _AppShellState extends State<AppShell> {
 
   Widget _uploadTab() {
     final image = _latestImage;
+    final selectedDeviceId =
+        _devices.any((device) => device.deviceId == _selectedDevice?.deviceId)
+        ? _selectedDevice!.deviceId
+        : null;
     return ListView(
       children: [
         _Section(
           title: 'Upload and send',
+          actions: [
+            IconButton(
+              onPressed: _refreshDevices,
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh devices',
+            ),
+          ],
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              DropdownButtonFormField<String>(
-                initialValue: _selectedDevice?.deviceId,
-                items: [
-                  for (final device in _devices)
-                    DropdownMenuItem(
-                      value: device.deviceId,
-                      child: Text(
-                        device.nickname?.isNotEmpty == true
-                            ? device.nickname!
-                            : device.deviceId,
-                      ),
+              InputDecorator(
+                decoration: InputDecoration(
+                  labelText: 'Target device',
+                  helperText: _devices.isEmpty
+                      ? 'No bound devices. Bind a device first, then refresh.'
+                      : null,
+                  border: const OutlineInputBorder(),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: selectedDeviceId,
+                    hint: Text(
+                      _devices.isEmpty
+                          ? 'No device available'
+                          : 'Select target device',
                     ),
-                ],
-                onChanged: (deviceId) => setState(
-                  () => _selectedDevice = _devices.firstWhere(
-                    (device) => device.deviceId == deviceId,
+                    items: [
+                      for (final device in _devices)
+                        DropdownMenuItem(
+                          value: device.deviceId,
+                          child: Text(
+                            device.nickname?.isNotEmpty == true
+                                ? '${device.nickname} (${device.deviceId})'
+                                : device.deviceId,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: _devices.isEmpty
+                        ? null
+                        : (deviceId) {
+                            if (deviceId == null) {
+                              return;
+                            }
+                            setState(
+                              () => _selectedDevice = _devices.firstWhere(
+                                (device) => device.deviceId == deviceId,
+                              ),
+                            );
+                          },
                   ),
                 ),
-                decoration: const InputDecoration(labelText: 'Target device'),
               ),
               const SizedBox(height: 12),
               SegmentedButton<String>(
