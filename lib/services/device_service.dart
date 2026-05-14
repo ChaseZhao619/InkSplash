@@ -64,6 +64,19 @@ class DeviceBindingService {
     );
   }
 
+  Future<AppDevice> updateDevice({
+    required String bearerToken,
+    required String deviceId,
+    String? nickname,
+  }) async {
+    final json = await _api.patchJson(
+      '/api/me/devices/$deviceId',
+      bearerToken: bearerToken,
+      body: {'nickname': nickname},
+    );
+    return AppDevice.fromJson(json);
+  }
+
   Future<DeviceManifest> assignImage({
     required String bearerToken,
     required String deviceId,
@@ -75,5 +88,87 @@ class DeviceBindingService {
       body: {'image_id': imageId},
     );
     return DeviceManifest.fromJson(json);
+  }
+
+  Future<DeviceInvite> createInvite({
+    required String bearerToken,
+    required String deviceId,
+    required String email,
+    required String role,
+  }) async {
+    final json = await _api.postJson(
+      '/api/me/devices/$deviceId/invites',
+      bearerToken: bearerToken,
+      body: {'email': email, 'role': role},
+    );
+    return DeviceInvite.fromJson(json);
+  }
+
+  Future<AppDevice> acceptInvite({
+    required String bearerToken,
+    required String token,
+  }) async {
+    final json = await _api.postJson(
+      '/api/me/device-invites/accept',
+      bearerToken: bearerToken,
+      body: {'token': token},
+    );
+    return AppDevice.fromJson(json);
+  }
+
+  Future<List<DeviceMember>> listMembers({
+    required String bearerToken,
+    required String deviceId,
+  }) async {
+    final json = await _api.getJson(
+      '/api/me/devices/$deviceId/members',
+      bearerToken: bearerToken,
+    );
+    final raw = json['members'] ?? [];
+    if (raw is! List) {
+      return const [];
+    }
+    return raw
+        .whereType<Map>()
+        .map(
+          (item) => DeviceMember.fromJson(
+            item.map((key, value) => MapEntry('$key', value)),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<void> removeMember({
+    required String bearerToken,
+    required String deviceId,
+    required String userId,
+  }) async {
+    await _api.deleteJson(
+      '/api/me/devices/$deviceId/members/$userId',
+      bearerToken: bearerToken,
+    );
+  }
+
+  Future<List<StatusEvent>> listStatusEvents({
+    required String bearerToken,
+    required String deviceId,
+    int limit = 50,
+  }) async {
+    final json = await _api.getJson(
+      '/api/me/devices/$deviceId/status-events?limit=$limit',
+      bearerToken: bearerToken,
+    );
+    final raw = json['events'] ?? [];
+    if (raw is! List) {
+      return const [];
+    }
+    return raw
+        .whereType<Map>()
+        .map(
+          (item) => StatusEvent.fromJson(
+            item.map((key, value) => MapEntry('$key', value)),
+          ),
+        )
+        .toList(growable: false);
   }
 }

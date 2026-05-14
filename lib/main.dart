@@ -10,6 +10,7 @@ import 'services/auth_service.dart';
 import 'services/device_service.dart';
 import 'services/image_service.dart';
 import 'services/provisioning_service.dart';
+import 'services/session_store.dart';
 
 void main() {
   runApp(const InkSplashApp());
@@ -45,9 +46,17 @@ class _AppShellState extends State<AppShell> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _deviceNicknameController = TextEditingController();
+  final _renameController = TextEditingController();
   final _wifiPasswordController = TextEditingController();
+  final _verifyEmailTokenController = TextEditingController();
+  final _resetEmailController = TextEditingController();
+  final _resetTokenController = TextEditingController();
+  final _resetPasswordController = TextEditingController();
+  final _inviteEmailController = TextEditingController();
+  final _inviteTokenController = TextEditingController();
 
   final _provisioning = const ProvisioningService();
+  final _sessionStore = const SessionStore();
 
   AuthSession? _session;
   ProvisioningQrPayload? _qrPayload;
@@ -56,10 +65,13 @@ class _AppShellState extends State<AppShell> {
   List<AppDevice> _devices = const [];
   AppDevice? _selectedDevice;
   WifiNetwork? _selectedWifi;
+  List<DeviceMember> _members = const [];
+  List<StatusEvent> _statusEvents = const [];
   ImageInfo? _latestImage;
   Uint8List? _previewPng;
   String _direction = 'auto';
   String _mode = 'scale';
+  String _inviteRole = 'viewer';
   bool _dither = true;
   bool _busy = false;
   String? _message;
@@ -71,12 +83,25 @@ class _AppShellState extends State<AppShell> {
   String? get _bearerToken => _session?.accessToken;
 
   @override
+  void initState() {
+    super.initState();
+    _restoreSession();
+  }
+
+  @override
   void dispose() {
     _baseUrlController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _deviceNicknameController.dispose();
+    _renameController.dispose();
     _wifiPasswordController.dispose();
+    _verifyEmailTokenController.dispose();
+    _resetEmailController.dispose();
+    _resetTokenController.dispose();
+    _resetPasswordController.dispose();
+    _inviteEmailController.dispose();
+    _inviteTokenController.dispose();
     super.dispose();
   }
 
@@ -114,10 +139,60 @@ class _AppShellState extends State<AppShell> {
           ? await _auth.register(email: email, password: password)
           : await _auth.login(email: email, password: password);
       final devices = await _deviceService.listDevices(session.accessToken);
+      await _sessionStore.save(
+        baseUrl: _baseUrlController.text.trim(),
+        accessToken: session.accessToken,
+      );
       setState(() {
         _session = session;
         _devices = devices;
         _selectedDevice = devices.isEmpty ? null : devices.first;
+        _renameController.text = _selectedDevice?.nickname ?? '';
+      });
+    });
+  }
+
+  Future<void> _restoreSession() async {
+    final stored = await _sessionStore.load();
+    if (stored == null) {
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      _baseUrlController.text = stored.baseUrl;
+      final user = await _auth.me(stored.accessToken);
+      final devices = await _deviceService.listDevices(stored.accessToken);
+      setState(() {
+        _session = AuthSession(
+          accessToken: stored.accessToken,
+          tokenType: 'bearer',
+          user: user,
+        );
+        _devices = devices;
+        _selectedDevice = devices.isEmpty ? null : devices.first;
+        _renameController.text = _selectedDevice?.nickname ?? '';
+      });
+    } catch (error) {
+      await _sessionStore.clear();
+      if (mounted) {
+        setState(() => _message = 'Saved login expired: $error');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _logout() async {
+    await _run('Logout', () async {
+      await _sessionStore.clear();
+      setState(() {
+        _session = null;
+        _devices = const [];
+        _selectedDevice = null;
+        _members = const [];
+        _statusEvents = const [];
       });
     });
   }
@@ -130,12 +205,156 @@ class _AppShellState extends State<AppShell> {
         _devices = devices;
         if (devices.isEmpty) {
           _selectedDevice = null;
+          _renameController.text = '';
         } else if (_selectedDevice == null ||
             !devices.any(
               (device) => device.deviceId == _selectedDevice!.deviceId,
             )) {
           _selectedDevice = devices.first;
+          _renameController.text = _selectedDevice?.nickname ?? '';
         }
+      });
+    });
+  }
+
+  Future<void> _requestEmailVerification() async {
+    final token = _requireLogin();
+    await _run('Request verification email', () async {
+      await _auth.requestEmailVerification(token);
+    });
+  }
+
+  Future<void> _confirmEmailVerification() async {
+    await _run('Confirm email', () async {
+      final user = await _auth.confirmEmailVerification(
+        token: _verifyEmailTokenController.text.trim(),
+      );
+      final session = _session;
+      if (session == null) {
+        return;
+      }
+      setState(() {
+        _session = AuthSession(
+          accessToken: session.accessToken,
+          tokenType: session.tokenType,
+          user: user,
+        );
+      });
+    });
+  }
+
+  Future<void> _requestPasswordReset() async {
+    await _run('Request password reset', () async {
+      final email = _resetEmailController.text.trim().isEmpty
+          ? _emailController.text.trim()
+          : _resetEmailController.text.trim();
+      if (email.length < 3) {
+        throw const ApiError('Please enter your email.');
+      }
+      await _auth.requestPasswordReset(email: email);
+    });
+  }
+
+  Future<void> _confirmPasswordReset() async {
+    await _run('Reset password', () async {
+      final newPassword = _resetPasswordController.text;
+      if (newPassword.length < 8) {
+        throw const ApiError('Password must be at least 8 characters.');
+      }
+      await _auth.confirmPasswordReset(
+        token: _resetTokenController.text.trim(),
+        newPassword: newPassword,
+      );
+    });
+  }
+
+  Future<void> _renameSelectedDevice() async {
+    final token = _requireLogin();
+    final device = _requireSelectedDevice();
+    await _run('Rename device', () async {
+      final updated = await _deviceService.updateDevice(
+        bearerToken: token,
+        deviceId: device.deviceId,
+        nickname: _renameController.text.trim().isEmpty
+            ? null
+            : _renameController.text.trim(),
+      );
+      final devices = await _deviceService.listDevices(token);
+      setState(() {
+        _devices = devices;
+        _selectedDevice = updated;
+      });
+    });
+  }
+
+  Future<void> _unbindSelectedDevice() async {
+    final token = _requireLogin();
+    final device = _requireSelectedDevice();
+    await _run('Unbind device', () async {
+      await _deviceService.unbindDevice(
+        bearerToken: token,
+        deviceId: device.deviceId,
+      );
+      final devices = await _deviceService.listDevices(token);
+      setState(() {
+        _devices = devices;
+        _selectedDevice = devices.isEmpty ? null : devices.first;
+        _renameController.text = _selectedDevice?.nickname ?? '';
+        _members = const [];
+        _statusEvents = const [];
+      });
+    });
+  }
+
+  Future<void> _refreshDeviceExtras() async {
+    final token = _requireLogin();
+    final device = _requireSelectedDevice();
+    await _run('Refresh device detail', () async {
+      final results = await Future.wait([
+        _deviceService.listMembers(
+          bearerToken: token,
+          deviceId: device.deviceId,
+        ),
+        _deviceService.listStatusEvents(
+          bearerToken: token,
+          deviceId: device.deviceId,
+        ),
+      ]);
+      setState(() {
+        _members = results[0] as List<DeviceMember>;
+        _statusEvents = results[1] as List<StatusEvent>;
+      });
+    });
+  }
+
+  Future<void> _createInvite() async {
+    final token = _requireLogin();
+    final device = _requireSelectedDevice();
+    await _run('Create invite', () async {
+      await _deviceService.createInvite(
+        bearerToken: token,
+        deviceId: device.deviceId,
+        email: _inviteEmailController.text.trim(),
+        role: _inviteRole,
+      );
+    });
+  }
+
+  Future<void> _acceptInvite() async {
+    final token = _requireLogin();
+    await _run('Accept invite', () async {
+      final device = await _deviceService.acceptInvite(
+        bearerToken: token,
+        token: _inviteTokenController.text.trim(),
+      );
+      final devices = await _deviceService.listDevices(token);
+      setState(() {
+        _devices = devices;
+        _selectedDevice = devices.firstWhere(
+          (item) => item.deviceId == device.deviceId,
+          orElse: () => device,
+        );
+        _renameController.text = _selectedDevice?.nickname ?? '';
       });
     });
   }
@@ -278,6 +497,14 @@ class _AppShellState extends State<AppShell> {
     return payload;
   }
 
+  AppDevice _requireSelectedDevice() {
+    final device = _selectedDevice;
+    if (device == null) {
+      throw const ApiError('Select or bind a device first.');
+    }
+    return device;
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -354,6 +581,12 @@ class _AppShellState extends State<AppShell> {
                     icon: const Icon(Icons.person_add),
                     label: const Text('Register'),
                   ),
+                  if (_session != null)
+                    TextButton.icon(
+                      onPressed: _logout,
+                      icon: const Icon(Icons.logout),
+                      label: const Text('Logout'),
+                    ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -362,8 +595,80 @@ class _AppShellState extends State<AppShell> {
                 child: Text(
                   _session == null
                       ? 'Not logged in'
-                      : 'Logged in as ${_session!.user.email}',
+                      : 'Logged in as ${_session!.user.email} (${_session!.user.emailVerified ? 'verified' : 'unverified'})',
                 ),
+              ),
+              if (_session != null && !_session!.user.emailVerified) ...[
+                const SizedBox(height: 16),
+                const Divider(),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Email verification',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _requestEmailVerification,
+                  icon: const Icon(Icons.mark_email_read_outlined),
+                  label: const Text('Send verification email'),
+                ),
+                TextField(
+                  controller: _verifyEmailTokenController,
+                  decoration: const InputDecoration(
+                    labelText: 'Verification token',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                FilledButton.icon(
+                  onPressed: _confirmEmailVerification,
+                  icon: const Icon(Icons.verified_user_outlined),
+                  label: const Text('Confirm verification'),
+                ),
+              ],
+              const SizedBox(height: 16),
+              const Divider(),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Password reset',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              TextField(
+                controller: _resetEmailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Reset email',
+                  helperText: 'Leave empty to use the email above.',
+                ),
+              ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _requestPasswordReset,
+                    icon: const Icon(Icons.lock_reset),
+                    label: const Text('Send reset email'),
+                  ),
+                ],
+              ),
+              TextField(
+                controller: _resetTokenController,
+                decoration: const InputDecoration(labelText: 'Reset token'),
+              ),
+              TextField(
+                controller: _resetPasswordController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'New password'),
+              ),
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                onPressed: _confirmPasswordReset,
+                icon: const Icon(Icons.password),
+                label: const Text('Reset password'),
               ),
             ],
           ),
@@ -400,7 +705,12 @@ class _AppShellState extends State<AppShell> {
                           ? Icons.radio_button_checked
                           : Icons.radio_button_unchecked,
                     ),
-                    onTap: () => setState(() => _selectedDevice = device),
+                    onTap: () => setState(() {
+                      _selectedDevice = device;
+                      _renameController.text = device.nickname ?? '';
+                      _members = const [];
+                      _statusEvents = const [];
+                    }),
                     title: Text(
                       device.nickname?.isNotEmpty == true
                           ? device.nickname!
@@ -408,6 +718,7 @@ class _AppShellState extends State<AppShell> {
                     ),
                     subtitle: Text(
                       [
+                        if (device.role != null) 'role ${device.role}',
                         'version ${device.currentVersion ?? 0}',
                         if (device.lastStatus != null)
                           'status ${device.lastStatus}',
@@ -416,6 +727,108 @@ class _AppShellState extends State<AppShell> {
                       ].join(' | '),
                     ),
                   ),
+              if (_selectedDevice != null) ...[
+                const Divider(),
+                TextField(
+                  controller: _renameController,
+                  decoration: const InputDecoration(labelText: 'Nickname'),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: _renameSelectedDevice,
+                      icon: const Icon(Icons.edit),
+                      label: const Text('Rename'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _refreshDeviceExtras,
+                      icon: const Icon(Icons.info_outline),
+                      label: const Text('Load members/status'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _unbindSelectedDevice,
+                      icon: const Icon(Icons.link_off),
+                      label: const Text('Unbind/leave'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Family sharing',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                TextField(
+                  controller: _inviteEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Invite email'),
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: _inviteRole,
+                  items: const [
+                    DropdownMenuItem(value: 'viewer', child: Text('Viewer')),
+                    DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _inviteRole = value ?? 'viewer'),
+                  decoration: const InputDecoration(labelText: 'Invite role'),
+                ),
+                const SizedBox(height: 8),
+                FilledButton.icon(
+                  onPressed: _createInvite,
+                  icon: const Icon(Icons.person_add_alt_1),
+                  label: const Text('Invite member'),
+                ),
+                TextField(
+                  controller: _inviteTokenController,
+                  decoration: const InputDecoration(labelText: 'Invite token'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _acceptInvite,
+                  icon: const Icon(Icons.group_add),
+                  label: const Text('Accept invite'),
+                ),
+                for (final member in _members)
+                  ListTile(
+                    leading: const Icon(Icons.person_outline),
+                    title: Text(member.email),
+                    subtitle: Text('${member.role} | ${member.userId}'),
+                  ),
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Recent status',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                if (_statusEvents.isEmpty)
+                  const ListTile(
+                    leading: Icon(Icons.history),
+                    title: Text('No status events loaded'),
+                  )
+                else
+                  for (final event in _statusEvents)
+                    ListTile(
+                      leading: const Icon(Icons.history),
+                      title: Text(event.status),
+                      subtitle: Text(
+                        [
+                          if (event.version != null) 'v${event.version}',
+                          if (event.error != null) event.error!,
+                          if (event.batteryMv != null) '${event.batteryMv} mV',
+                          if (event.rssi != null) '${event.rssi} dBm',
+                          if (event.createdAt != null) event.createdAt!,
+                        ].join(' | '),
+                      ),
+                    ),
+              ],
             ],
           ),
         ),

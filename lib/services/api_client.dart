@@ -61,6 +61,23 @@ class EpaperApiClient {
     return _decodeObject(response);
   }
 
+  Future<Map<String, dynamic>> patchJson(
+    String path, {
+    Object? body,
+    String? bearerToken,
+    Map<String, String>? headers,
+  }) async {
+    final response = await _httpClient.patch(
+      resolve(path),
+      headers: _headers(
+        bearerToken: bearerToken,
+        extra: {'Content-Type': 'application/json', ...?headers},
+      ),
+      body: jsonEncode(body ?? const {}),
+    );
+    return _decodeObject(response);
+  }
+
   Future<Map<String, dynamic>> multipartJson(
     String path, {
     required String filePath,

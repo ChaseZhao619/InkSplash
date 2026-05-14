@@ -15,17 +15,23 @@ class User {
   const User({
     required this.userId,
     required this.email,
+    required this.emailVerified,
     required this.createdAt,
+    this.emailVerifiedAt,
   });
 
   final String userId;
   final String email;
+  final bool emailVerified;
+  final String? emailVerifiedAt;
   final String? createdAt;
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       userId: _string(json['user_id'] ?? json['id']),
       email: _string(json['email']),
+      emailVerified: json['email_verified'] == true,
+      emailVerifiedAt: _nullableString(json['email_verified_at']),
       createdAt: _nullableString(json['created_at']),
     );
   }
@@ -164,8 +170,10 @@ class AppDevice {
   const AppDevice({
     required this.deviceId,
     this.nickname,
+    this.role,
     this.currentImageId,
     this.currentVersion,
+    this.updatedAt,
     this.lastSeenAt,
     this.lastStatus,
     this.lastError,
@@ -176,8 +184,10 @@ class AppDevice {
 
   final String deviceId;
   final String? nickname;
+  final String? role;
   final String? currentImageId;
   final int? currentVersion;
+  final String? updatedAt;
   final String? lastSeenAt;
   final String? lastStatus;
   final String? lastError;
@@ -189,14 +199,106 @@ class AppDevice {
     return AppDevice(
       deviceId: _string(json['device_id']),
       nickname: _nullableString(json['nickname']),
+      role: _nullableString(json['role']),
       currentImageId: _nullableString(json['current_image_id']),
       currentVersion: _nullableInt(json['current_version']),
+      updatedAt: _nullableString(json['updated_at']),
       lastSeenAt: _nullableString(json['last_seen_at']),
       lastStatus: _nullableString(json['last_status']),
       lastError: _nullableString(json['last_error']),
       batteryMv: _nullableInt(json['battery_mv']),
       rssi: _nullableInt(json['rssi']),
       claimedAt: _nullableString(json['claimed_at']),
+    );
+  }
+}
+
+class DeviceMember {
+  const DeviceMember({
+    required this.userId,
+    required this.email,
+    required this.role,
+    this.createdAt,
+  });
+
+  final String userId;
+  final String email;
+  final String role;
+  final String? createdAt;
+
+  factory DeviceMember.fromJson(Map<String, dynamic> json) {
+    return DeviceMember(
+      userId: _string(json['user_id']),
+      email: _string(json['email']),
+      role: _string(json['role']),
+      createdAt: _nullableString(json['created_at']),
+    );
+  }
+}
+
+class DeviceInvite {
+  const DeviceInvite({
+    required this.inviteId,
+    required this.deviceId,
+    required this.email,
+    required this.role,
+    this.expiresAt,
+    this.createdAt,
+    this.token,
+  });
+
+  final String inviteId;
+  final String deviceId;
+  final String email;
+  final String role;
+  final String? expiresAt;
+  final String? createdAt;
+  final String? token;
+
+  factory DeviceInvite.fromJson(Map<String, dynamic> json) {
+    return DeviceInvite(
+      inviteId: _string(json['invite_id']),
+      deviceId: _string(json['device_id']),
+      email: _string(json['email']),
+      role: _string(json['role']),
+      expiresAt: _nullableString(json['expires_at']),
+      createdAt: _nullableString(json['created_at']),
+      token: _nullableString(json['token']),
+    );
+  }
+}
+
+class StatusEvent {
+  const StatusEvent({
+    required this.id,
+    required this.deviceId,
+    required this.status,
+    this.version,
+    this.error,
+    this.batteryMv,
+    this.rssi,
+    this.createdAt,
+  });
+
+  final int id;
+  final String deviceId;
+  final int? version;
+  final String status;
+  final String? error;
+  final int? batteryMv;
+  final int? rssi;
+  final String? createdAt;
+
+  factory StatusEvent.fromJson(Map<String, dynamic> json) {
+    return StatusEvent(
+      id: _int(json['id']),
+      deviceId: _string(json['device_id']),
+      version: _nullableInt(json['version']),
+      status: _string(json['status']),
+      error: _nullableString(json['error']),
+      batteryMv: _nullableInt(json['battery_mv']),
+      rssi: _nullableInt(json['rssi']),
+      createdAt: _nullableString(json['created_at']),
     );
   }
 }
