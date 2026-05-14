@@ -22,6 +22,22 @@ class AppStrings {
   String get upload => isZh ? '上传' : 'Upload';
   String get galleryTone =>
       isZh ? '安静地把画面送到墨水屏' : 'Quiet image delivery for e-paper';
+  String get welcomeBack => isZh ? '欢迎回来' : 'Welcome back';
+  String get signInSubtitle =>
+      isZh ? '登录后管理你的墨水屏和共享设备。' : 'Sign in to manage your e-paper displays.';
+  String get createAccount => isZh ? '创建账号' : 'Create account';
+  String get forgotPassword => isZh ? '忘记密码' : 'Forgot password';
+  String get backToLogin => isZh ? '返回登录' : 'Back to login';
+  String get haveAccount =>
+      isZh ? '已有账号？去登录' : 'Already have an account? Sign in';
+  String get noAccount => isZh ? '没有账号？去注册' : 'No account? Create one';
+  String get sendCode => isZh ? '发送验证码' : 'Send code';
+  String get sixDigitCode => isZh ? '6 位验证码' : '6-character code';
+  String get codeHelp => isZh
+      ? '请输入邮件中的 6 位数字或字母。'
+      : 'Enter the 6 letters or digits from your email.';
+  String get invalidSixCode =>
+      isZh ? '验证码必须是 6 位数字或字母。' : 'Code must be 6 letters or digits.';
   String get currentCanvas => isZh ? '当前画布' : 'Current canvas';
   String get noPreview => isZh ? '还没有图片预览' : 'No image preview yet';
   String get chooseUploadAssign => isZh ? '选择图片并下发' : 'Choose image and send';
@@ -38,6 +54,29 @@ class AppStrings {
   String get loadMembersStatus => isZh ? '加载成员与状态' : 'Load members/status';
   String get unbindLeave => isZh ? '解绑 / 退出' : 'Unbind / leave';
   String get familySharing => isZh ? '家庭共享' : 'Family sharing';
+  String get shareMembers => isZh ? '共享与成员' : 'Sharing & members';
+  String get manageSharing => isZh ? '管理共享' : 'Manage sharing';
+  String get members => isZh ? '成员' : 'Members';
+  String get noMembersLoaded => isZh ? '还没有加载成员' : 'No members loaded';
+  String get groups => isZh ? '家庭 / 好友组' : 'Family / friend groups';
+  String get groupName => isZh ? '组名称' : 'Group name';
+  String get groupKind => isZh ? '组类型' : 'Group type';
+  String get familyGroup => isZh ? '家庭组' : 'Family';
+  String get friendsGroup => isZh ? '好友组' : 'Friends';
+  String get createGroup => isZh ? '创建组' : 'Create group';
+  String get selectGroup => isZh ? '选择组' : 'Select group';
+  String get noGroups => isZh ? '还没有家庭组或好友组' : 'No family or friend groups yet';
+  String get selectGroupFirst =>
+      isZh ? '请先选择家庭组或好友组。' : 'Select a family or friend group first.';
+  String get enterGroupName => isZh ? '请输入组名称。' : 'Enter a group name.';
+  String get groupInviteEmail => isZh ? '成员邮箱' : 'Member email';
+  String get groupInviteCode => isZh ? '组邀请码' : 'Group invite code';
+  String get inviteToGroup => isZh ? '邀请到组' : 'Invite to group';
+  String get acceptGroupInvite => isZh ? '接受组邀请' : 'Accept group invite';
+  String get sharedDevices => isZh ? '共享设备' : 'Shared devices';
+  String get shareCurrentDevice =>
+      isZh ? '共享当前设备到组' : 'Share current device to group';
+  String get noGroupDevices => isZh ? '还没有共享设备' : 'No shared devices';
   String get inviteEmail => isZh ? '邀请邮箱' : 'Invite email';
   String get inviteRole => isZh ? '邀请角色' : 'Invite role';
   String get viewer => isZh ? '查看者' : 'Viewer';
@@ -75,14 +114,14 @@ class AppStrings {
   String get emailVerification => isZh ? '邮箱验证' : 'Email verification';
   String get sendVerificationEmail =>
       isZh ? '发送验证邮件' : 'Send verification email';
-  String get verificationToken => isZh ? '验证 token' : 'Verification token';
+  String get verificationToken => isZh ? '邮箱验证码' : 'Email code';
   String get confirmVerification => isZh ? '确认验证' : 'Confirm verification';
   String get passwordReset => isZh ? '重置密码' : 'Password reset';
   String get resetEmail => isZh ? '重置邮箱' : 'Reset email';
   String get resetEmailHelp =>
       isZh ? '留空则使用上方邮箱。' : 'Leave empty to use the email above.';
   String get sendResetEmail => isZh ? '发送重置邮件' : 'Send reset email';
-  String get resetToken => isZh ? '重置 token' : 'Reset token';
+  String get resetToken => isZh ? '重置验证码' : 'Reset code';
   String get newPassword => isZh ? '新密码' : 'New password';
   String get resetPassword => isZh ? '重置密码' : 'Reset password';
   String get language => isZh ? '语言' : 'Language';
@@ -139,6 +178,14 @@ class AppStrings {
       isZh ? '刷新设备详情' : 'Refresh device detail';
   String get createInviteAction => isZh ? '创建邀请' : 'Create invite';
   String get acceptInviteAction => isZh ? '接受邀请' : 'Accept invite';
+  String get refreshGroupsAction => isZh ? '刷新组' : 'Refresh groups';
+  String get createGroupAction => isZh ? '创建组' : 'Create group';
+  String get refreshGroupDetailAction =>
+      isZh ? '刷新组详情' : 'Refresh group detail';
+  String get createGroupInviteAction => isZh ? '邀请组成员' : 'Invite group member';
+  String get acceptGroupInviteAction => isZh ? '接受组邀请' : 'Accept group invite';
+  String get shareDeviceToGroupAction =>
+      isZh ? '共享设备到组' : 'Share device to group';
   String get bleSearchAction => isZh ? '搜索 BLE' : 'BLE search';
   String get bleConnectAction => isZh ? '连接 BLE' : 'BLE connect';
   String get provisionClaimAction => isZh ? '配网绑定' : 'Provision and claim';

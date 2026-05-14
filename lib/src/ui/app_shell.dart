@@ -1,6 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart' hide ImageInfo;
+import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../models.dart';
@@ -54,6 +53,26 @@ class _AppShellState extends State<AppShell> {
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
+        if (_controller.session == null) {
+          return Scaffold(
+            body: SafeArea(
+              child: Column(
+                children: [
+                  if (_controller.message != null)
+                    _MessageBanner(message: _controller.message!),
+                  if (_controller.busy) const LinearProgressIndicator(),
+                  Expanded(
+                    child: _AuthPage(
+                      controller: _controller,
+                      language: widget.language,
+                      onLanguageChanged: widget.onLanguageChanged,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
         final pages = [
           _HomePage(controller: _controller),
           _DevicesPage(controller: _controller),
@@ -122,6 +141,159 @@ class _AppShellState extends State<AppShell> {
           ),
         );
       },
+    );
+  }
+}
+
+enum _AuthMode { login, register, reset }
+
+class _AuthPage extends StatefulWidget {
+  const _AuthPage({
+    required this.controller,
+    required this.language,
+    required this.onLanguageChanged,
+  });
+
+  final AppController controller;
+  final LanguagePreference language;
+  final ValueChanged<LanguagePreference> onLanguageChanged;
+
+  @override
+  State<_AuthPage> createState() => _AuthPageState();
+}
+
+class _AuthPageState extends State<_AuthPage> {
+  _AuthMode _mode = _AuthMode.login;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    final controller = widget.controller;
+    final isRegister = _mode == _AuthMode.register;
+    final isReset = _mode == _AuthMode.reset;
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(24, 42, 24, 24),
+          shrinkWrap: true,
+          children: [
+            Text(
+              s.appName,
+              style: Theme.of(
+                context,
+              ).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isRegister
+                  ? s.createAccount
+                  : isReset
+                  ? s.forgotPassword
+                  : s.welcomeBack,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Text(s.signInSubtitle),
+            const SizedBox(height: 26),
+            if (!isReset) ...[
+              TextField(
+                controller: controller.emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(labelText: s.email),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller.passwordController,
+                obscureText: true,
+                decoration: InputDecoration(labelText: s.password),
+              ),
+              const SizedBox(height: 18),
+              FilledButton(
+                onPressed: () => controller.login(s, register: isRegister),
+                child: Text(isRegister ? s.createAccount : s.login),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => setState(
+                  () =>
+                      _mode = isRegister ? _AuthMode.login : _AuthMode.register,
+                ),
+                child: Text(isRegister ? s.haveAccount : s.noAccount),
+              ),
+              TextButton(
+                onPressed: () => setState(() => _mode = _AuthMode.reset),
+                child: Text(s.forgotPassword),
+              ),
+            ] else ...[
+              TextField(
+                controller: controller.resetEmailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: s.resetEmail,
+                  helperText: s.resetEmailHelp,
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => controller.requestPasswordReset(s),
+                icon: const Icon(Icons.mark_email_read_outlined),
+                label: Text(s.sendCode),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller.resetTokenController,
+                textCapitalization: TextCapitalization.characters,
+                inputFormatters: _codeFormatters,
+                decoration: InputDecoration(
+                  labelText: s.resetToken,
+                  helperText: s.codeHelp,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller.resetPasswordController,
+                obscureText: true,
+                decoration: InputDecoration(labelText: s.newPassword),
+              ),
+              const SizedBox(height: 18),
+              FilledButton(
+                onPressed: () => controller.confirmPasswordReset(s),
+                child: Text(s.resetPassword),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => setState(() => _mode = _AuthMode.login),
+                child: Text(s.backToLogin),
+              ),
+            ],
+            const SizedBox(height: 18),
+            SegmentedButton<LanguagePreference>(
+              segments: [
+                ButtonSegment(
+                  value: LanguagePreference.system,
+                  label: Text(s.followSystem),
+                  icon: const Icon(Icons.phone_iphone),
+                ),
+                ButtonSegment(
+                  value: LanguagePreference.zh,
+                  label: Text(s.simplifiedChinese),
+                ),
+                ButtonSegment(
+                  value: LanguagePreference.en,
+                  label: Text(s.english),
+                ),
+              ],
+              selected: {widget.language},
+              onSelectionChanged: (value) =>
+                  widget.onLanguageChanged(value.first),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -308,51 +480,18 @@ class _DevicesPage extends StatelessWidget {
           ),
         if (selected != null)
           _Panel(
-            title: s.familySharing,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: controller.inviteEmailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(labelText: s.inviteEmail),
+            title: s.shareMembers,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.group_outlined),
+              title: Text(s.manageSharing),
+              subtitle: Text(s.groups),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => _SharingPage(controller: controller),
                 ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  initialValue: controller.inviteRole,
-                  items: [
-                    DropdownMenuItem(value: 'viewer', child: Text(s.viewer)),
-                    DropdownMenuItem(value: 'admin', child: Text(s.admin)),
-                  ],
-                  onChanged: (value) =>
-                      controller.setInviteRole(value ?? 'viewer'),
-                  decoration: InputDecoration(labelText: s.inviteRole),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: () => controller.createInvite(s),
-                  icon: const Icon(Icons.person_add_alt_1),
-                  label: Text(s.inviteMember),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: controller.inviteTokenController,
-                  decoration: InputDecoration(labelText: s.inviteToken),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: () => controller.acceptInviteToken(s),
-                  icon: const Icon(Icons.group_add_outlined),
-                  label: Text(s.acceptInvite),
-                ),
-                for (final member in controller.members)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.person_outline),
-                    title: Text(member.email),
-                    subtitle: Text('${member.role} | ${member.userId}'),
-                  ),
-              ],
+              ),
             ),
           ),
         if (selected != null)
@@ -382,6 +521,204 @@ class _DevicesPage extends StatelessWidget {
                   ),
           ),
       ],
+    );
+  }
+}
+
+class _SharingPage extends StatelessWidget {
+  const _SharingPage({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    final device = controller.selectedDevice;
+    final group = controller.selectedGroup;
+
+    return Scaffold(
+      appBar: AppBar(title: Text(s.shareMembers)),
+      body: _PageScaffold(
+        children: [
+          _Panel(
+            title: s.groups,
+            action: IconButton(
+              onPressed: () => controller.refreshGroups(s),
+              icon: const Icon(Icons.refresh),
+              tooltip: s.refreshDevices,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: controller.groupNameController,
+                  decoration: InputDecoration(labelText: s.groupName),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: controller.groupKind,
+                  items: [
+                    DropdownMenuItem(
+                      value: 'family',
+                      child: Text(s.familyGroup),
+                    ),
+                    DropdownMenuItem(
+                      value: 'friends',
+                      child: Text(s.friendsGroup),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      controller.setGroupKind(value ?? 'family'),
+                  decoration: InputDecoration(labelText: s.groupKind),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: () => controller.createGroup(s),
+                  icon: const Icon(Icons.group_add_outlined),
+                  label: Text(s.createGroup),
+                ),
+                const SizedBox(height: 16),
+                if (controller.groups.isEmpty)
+                  _EmptyState(icon: Icons.group_outlined, text: s.noGroups)
+                else
+                  DropdownButtonFormField<String>(
+                    initialValue: group?.groupId,
+                    items: [
+                      for (final item in controller.groups)
+                        DropdownMenuItem(
+                          value: item.groupId,
+                          child: Text(
+                            '${item.name} (${item.kind})',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) {
+                        return;
+                      }
+                      controller.selectGroup(
+                        controller.groups.firstWhere(
+                          (item) => item.groupId == value,
+                        ),
+                      );
+                    },
+                    decoration: InputDecoration(labelText: s.selectGroup),
+                  ),
+              ],
+            ),
+          ),
+          _Panel(
+            title: s.inviteMember,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: controller.groupInviteEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(labelText: s.groupInviteEmail),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: controller.groupInviteRole,
+                  items: [
+                    DropdownMenuItem(value: 'member', child: Text(s.viewer)),
+                    DropdownMenuItem(value: 'admin', child: Text(s.admin)),
+                  ],
+                  onChanged: (value) =>
+                      controller.setGroupInviteRole(value ?? 'member'),
+                  decoration: InputDecoration(labelText: s.inviteRole),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: group == null
+                      ? null
+                      : () => controller.createGroupInvite(s),
+                  icon: const Icon(Icons.person_add_alt_1),
+                  label: Text(s.inviteToGroup),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: controller.groupInviteCodeController,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: _codeFormatters,
+                  decoration: InputDecoration(
+                    labelText: s.groupInviteCode,
+                    helperText: s.codeHelp,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () => controller.acceptGroupInvite(s),
+                  icon: const Icon(Icons.group_add_outlined),
+                  label: Text(s.acceptGroupInvite),
+                ),
+              ],
+            ),
+          ),
+          _Panel(
+            title: s.members,
+            action: IconButton(
+              onPressed: group == null
+                  ? null
+                  : () => controller.refreshGroupDetail(s),
+              icon: const Icon(Icons.refresh),
+            ),
+            child: controller.groupMembers.isEmpty
+                ? _EmptyState(
+                    icon: Icons.group_outlined,
+                    text: s.noMembersLoaded,
+                  )
+                : Column(
+                    children: [
+                      for (final member in controller.groupMembers)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.person_outline),
+                          title: Text(member.email),
+                          subtitle: Text('${member.role} | ${member.userId}'),
+                        ),
+                    ],
+                  ),
+          ),
+          _Panel(
+            title: s.sharedDevices,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: controller.groupDeviceRole,
+                  items: [
+                    DropdownMenuItem(value: 'viewer', child: Text(s.viewer)),
+                    DropdownMenuItem(value: 'admin', child: Text(s.admin)),
+                  ],
+                  onChanged: (value) =>
+                      controller.setGroupDeviceRole(value ?? 'admin'),
+                  decoration: InputDecoration(labelText: s.inviteRole),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: group == null || device == null
+                      ? null
+                      : () => controller.shareSelectedDeviceToGroup(s),
+                  icon: const Icon(Icons.devices_other_outlined),
+                  label: Text(s.shareCurrentDevice),
+                ),
+                const SizedBox(height: 12),
+                if (controller.groupDevices.isEmpty)
+                  _EmptyState(icon: Icons.devices_other, text: s.noGroupDevices)
+                else
+                  for (final item in controller.groupDevices)
+                    _DeviceTile(
+                      device: item,
+                      selected: item.deviceId == device?.deviceId,
+                      onTap: () => controller.selectDevice(item),
+                    ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -508,41 +845,6 @@ class _SettingsPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextField(
-                controller: controller.emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(labelText: s.email),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: controller.passwordController,
-                obscureText: true,
-                decoration: InputDecoration(labelText: s.password),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  FilledButton.icon(
-                    onPressed: () => controller.login(s, register: false),
-                    icon: const Icon(Icons.login),
-                    label: Text(s.login),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => controller.login(s, register: true),
-                    icon: const Icon(Icons.person_add_outlined),
-                    label: Text(s.register),
-                  ),
-                  if (session != null)
-                    TextButton.icon(
-                      onPressed: () => controller.logout(s),
-                      icon: const Icon(Icons.logout),
-                      label: Text(s.logout),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
               Text(
                 session == null
                     ? s.notLoggedIn
@@ -550,6 +852,23 @@ class _SettingsPage extends StatelessWidget {
                         session.user.email,
                         session.user.emailVerified,
                       ),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.lock_reset),
+                title: Text(s.passwordReset),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => _PasswordResetPage(controller: controller),
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => controller.logout(s),
+                icon: const Icon(Icons.logout),
+                label: Text(s.logout),
               ),
             ],
           ),
@@ -568,7 +887,12 @@ class _SettingsPage extends StatelessWidget {
                 const SizedBox(height: 10),
                 TextField(
                   controller: controller.verifyEmailTokenController,
-                  decoration: InputDecoration(labelText: s.verificationToken),
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: _codeFormatters,
+                  decoration: InputDecoration(
+                    labelText: s.verificationToken,
+                    helperText: s.codeHelp,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 FilledButton.icon(
@@ -579,45 +903,6 @@ class _SettingsPage extends StatelessWidget {
               ],
             ),
           ),
-        _Panel(
-          title: s.passwordReset,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: controller.resetEmailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  labelText: s.resetEmail,
-                  helperText: s.resetEmailHelp,
-                ),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: () => controller.requestPasswordReset(s),
-                icon: const Icon(Icons.lock_reset),
-                label: Text(s.sendResetEmail),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: controller.resetTokenController,
-                decoration: InputDecoration(labelText: s.resetToken),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: controller.resetPasswordController,
-                obscureText: true,
-                decoration: InputDecoration(labelText: s.newPassword),
-              ),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: () => controller.confirmPasswordReset(s),
-                icon: const Icon(Icons.password),
-                label: Text(s.resetPassword),
-              ),
-            ],
-          ),
-        ),
         _Panel(
           title: s.language,
           child: SegmentedButton<LanguagePreference>(
@@ -652,6 +937,68 @@ class _SettingsPage extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PasswordResetPage extends StatelessWidget {
+  const _PasswordResetPage({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    return Scaffold(
+      appBar: AppBar(title: Text(s.passwordReset)),
+      body: _PageScaffold(
+        children: [
+          _Panel(
+            title: s.passwordReset,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: controller.resetEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: s.resetEmail,
+                    helperText: s.resetEmailHelp,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () => controller.requestPasswordReset(s),
+                  icon: const Icon(Icons.lock_reset),
+                  label: Text(s.sendCode),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: controller.resetTokenController,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: _codeFormatters,
+                  decoration: InputDecoration(
+                    labelText: s.resetToken,
+                    helperText: s.codeHelp,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: controller.resetPasswordController,
+                  obscureText: true,
+                  decoration: InputDecoration(labelText: s.newPassword),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: () => controller.confirmPasswordReset(s),
+                  icon: const Icon(Icons.password),
+                  label: Text(s.resetPassword),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1039,3 +1386,12 @@ String _deviceTitle(AppDevice device) {
       ? device.nickname!
       : device.deviceId;
 }
+
+final _codeFormatters = [
+  FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]')),
+  LengthLimitingTextInputFormatter(6),
+  TextInputFormatter.withFunction(
+    (oldValue, newValue) =>
+        newValue.copyWith(text: newValue.text.toUpperCase()),
+  ),
+];

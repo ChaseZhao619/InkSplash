@@ -7,6 +7,7 @@ import '../../models.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../services/device_service.dart';
+import '../../services/group_service.dart';
 import '../../services/image_service.dart';
 import '../../services/provisioning_service.dart';
 import '../../services/session_store.dart';
@@ -33,6 +34,9 @@ class AppController extends ChangeNotifier {
   final resetPasswordController = TextEditingController();
   final inviteEmailController = TextEditingController();
   final inviteTokenController = TextEditingController();
+  final groupNameController = TextEditingController();
+  final groupInviteEmailController = TextEditingController();
+  final groupInviteCodeController = TextEditingController();
 
   final ProvisioningService _provisioning;
   final SessionStore _sessionStore;
@@ -46,11 +50,18 @@ class AppController extends ChangeNotifier {
   WifiNetwork? selectedWifi;
   List<DeviceMember> members = const [];
   List<StatusEvent> statusEvents = const [];
+  List<AccountGroup> groups = const [];
+  AccountGroup? selectedGroup;
+  List<AccountGroupMember> groupMembers = const [];
+  List<AppDevice> groupDevices = const [];
   ImageInfo? latestImage;
   Uint8List? previewPng;
   String direction = 'auto';
   String mode = 'scale';
   String inviteRole = 'viewer';
+  String groupKind = 'family';
+  String groupInviteRole = 'member';
+  String groupDeviceRole = 'admin';
   bool dither = true;
   bool busy = false;
   String? message;
@@ -58,6 +69,7 @@ class AppController extends ChangeNotifier {
   EpaperApiClient get _api => EpaperApiClient(baseUrl: baseUrlController.text);
   AuthService get _auth => AuthService(_api);
   DeviceBindingService get _deviceService => DeviceBindingService(_api);
+  GroupService get _groupService => GroupService(_api);
   ImageService get _imageService => ImageService(_api);
   String? get bearerToken => session?.accessToken;
 
@@ -80,6 +92,7 @@ class AppController extends ChangeNotifier {
         user: user,
       );
       devices = loadedDevices;
+      await _refreshGroupsWithToken(stored.accessToken);
       selectedDevice = loadedDevices.isEmpty ? null : loadedDevices.first;
       renameController.text = selectedDevice?.nickname ?? '';
     } catch (error) {
@@ -135,6 +148,7 @@ class AppController extends ChangeNotifier {
       );
       session = nextSession;
       devices = loadedDevices;
+      await _refreshGroupsWithToken(nextSession.accessToken);
       selectedDevice = loadedDevices.isEmpty ? null : loadedDevices.first;
       renameController.text = selectedDevice?.nickname ?? '';
     });
@@ -148,6 +162,10 @@ class AppController extends ChangeNotifier {
       selectedDevice = null;
       members = const [];
       statusEvents = const [];
+      groups = const [];
+      selectedGroup = null;
+      groupMembers = const [];
+      groupDevices = const [];
     });
   }
 
@@ -178,9 +196,9 @@ class AppController extends ChangeNotifier {
 
   Future<void> confirmEmailVerification(AppStrings s) async {
     await runAction(s, s.confirmEmailAction, () async {
-      final user = await _auth.confirmEmailVerification(
-        token: verifyEmailTokenController.text.trim(),
-      );
+      final code = verifyEmailTokenController.text.trim();
+      _requireSixCharacterCode(s, code);
+      final user = await _auth.confirmEmailVerification(token: code);
       final current = session;
       if (current == null) {
         return;
@@ -207,14 +225,13 @@ class AppController extends ChangeNotifier {
 
   Future<void> confirmPasswordReset(AppStrings s) async {
     await runAction(s, s.resetPasswordAction, () async {
+      final code = resetTokenController.text.trim();
+      _requireSixCharacterCode(s, code);
       final newPassword = resetPasswordController.text;
       if (newPassword.length < 8) {
         throw ApiError(s.passwordTooShort);
       }
-      await _auth.confirmPasswordReset(
-        token: resetTokenController.text.trim(),
-        newPassword: newPassword,
-      );
+      await _auth.confirmPasswordReset(token: code, newPassword: newPassword);
     });
   }
 
@@ -287,9 +304,11 @@ class AppController extends ChangeNotifier {
   Future<void> acceptInviteToken(AppStrings s) async {
     final token = requireLogin(s);
     await runAction(s, s.acceptInviteAction, () async {
+      final code = inviteTokenController.text.trim();
+      _requireSixCharacterCode(s, code);
       final device = await _deviceService.acceptInvite(
         bearerToken: token,
-        token: inviteTokenController.text.trim(),
+        token: code,
       );
       final loadedDevices = await _deviceService.listDevices(token);
       devices = loadedDevices;
@@ -298,6 +317,80 @@ class AppController extends ChangeNotifier {
         orElse: () => device,
       );
       renameController.text = selectedDevice?.nickname ?? '';
+    });
+  }
+
+  Future<void> refreshGroups(AppStrings s) async {
+    final token = requireLogin(s);
+    await runAction(s, s.refreshGroupsAction, () async {
+      await _refreshGroupsWithToken(token);
+    });
+  }
+
+  Future<void> createGroup(AppStrings s) async {
+    final token = requireLogin(s);
+    await runAction(s, s.createGroupAction, () async {
+      final name = groupNameController.text.trim();
+      if (name.isEmpty) {
+        throw ApiError(s.enterGroupName);
+      }
+      final group = await _groupService.createGroup(
+        bearerToken: token,
+        name: name,
+        kind: groupKind,
+      );
+      await _refreshGroupsWithToken(token, preferredGroupId: group.groupId);
+      groupNameController.clear();
+    });
+  }
+
+  Future<void> refreshGroupDetail(AppStrings s) async {
+    final token = requireLogin(s);
+    final group = requireSelectedGroup(s);
+    await runAction(s, s.refreshGroupDetailAction, () async {
+      await _refreshGroupDetailWithToken(token, group.groupId);
+    });
+  }
+
+  Future<void> createGroupInvite(AppStrings s) async {
+    final token = requireLogin(s);
+    final group = requireSelectedGroup(s);
+    await runAction(s, s.createGroupInviteAction, () async {
+      await _groupService.createInvite(
+        bearerToken: token,
+        groupId: group.groupId,
+        email: groupInviteEmailController.text.trim(),
+        role: groupInviteRole,
+      );
+    });
+  }
+
+  Future<void> acceptGroupInvite(AppStrings s) async {
+    final token = requireLogin(s);
+    await runAction(s, s.acceptGroupInviteAction, () async {
+      final code = groupInviteCodeController.text.trim();
+      _requireSixCharacterCode(s, code);
+      final group = await _groupService.acceptInvite(
+        bearerToken: token,
+        code: code,
+      );
+      await _refreshGroupsWithToken(token, preferredGroupId: group.groupId);
+      groupInviteCodeController.clear();
+    });
+  }
+
+  Future<void> shareSelectedDeviceToGroup(AppStrings s) async {
+    final token = requireLogin(s);
+    final group = requireSelectedGroup(s);
+    final device = requireSelectedDevice(s);
+    await runAction(s, s.shareDeviceToGroupAction, () async {
+      await _groupService.shareDevice(
+        bearerToken: token,
+        groupId: group.groupId,
+        deviceId: device.deviceId,
+        role: groupDeviceRole,
+      );
+      await _refreshGroupDetailWithToken(token, group.groupId);
     });
   }
 
@@ -438,6 +531,28 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setGroupKind(String value) {
+    groupKind = value;
+    notifyListeners();
+  }
+
+  void setGroupInviteRole(String value) {
+    groupInviteRole = value;
+    notifyListeners();
+  }
+
+  void setGroupDeviceRole(String value) {
+    groupDeviceRole = value;
+    notifyListeners();
+  }
+
+  void selectGroup(AccountGroup group) {
+    selectedGroup = group;
+    groupMembers = const [];
+    groupDevices = const [];
+    notifyListeners();
+  }
+
   void setDirection(String value) {
     direction = value;
     notifyListeners();
@@ -477,6 +592,51 @@ class AppController extends ChangeNotifier {
     return device;
   }
 
+  AccountGroup requireSelectedGroup(AppStrings s) {
+    final group = selectedGroup;
+    if (group == null) {
+      throw ApiError(s.selectGroupFirst);
+    }
+    return group;
+  }
+
+  Future<void> _refreshGroupsWithToken(
+    String token, {
+    String? preferredGroupId,
+  }) async {
+    final loadedGroups = await _groupService.listGroups(token);
+    groups = loadedGroups;
+    if (loadedGroups.isEmpty) {
+      selectedGroup = null;
+      groupMembers = const [];
+      groupDevices = const [];
+      return;
+    }
+    final preferred = preferredGroupId ?? selectedGroup?.groupId;
+    selectedGroup = loadedGroups.firstWhere(
+      (group) => group.groupId == preferred,
+      orElse: () => loadedGroups.first,
+    );
+  }
+
+  Future<void> _refreshGroupDetailWithToken(
+    String token,
+    String groupId,
+  ) async {
+    final results = await Future.wait([
+      _groupService.listMembers(bearerToken: token, groupId: groupId),
+      _groupService.listDevices(bearerToken: token, groupId: groupId),
+    ]);
+    groupMembers = results[0] as List<AccountGroupMember>;
+    groupDevices = results[1] as List<AppDevice>;
+  }
+
+  void _requireSixCharacterCode(AppStrings s, String code) {
+    if (!RegExp(r'^[A-Za-z0-9]{6}$').hasMatch(code)) {
+      throw ApiError(s.invalidSixCode);
+    }
+  }
+
   @override
   void dispose() {
     baseUrlController.dispose();
@@ -491,6 +651,9 @@ class AppController extends ChangeNotifier {
     resetPasswordController.dispose();
     inviteEmailController.dispose();
     inviteTokenController.dispose();
+    groupNameController.dispose();
+    groupInviteEmailController.dispose();
+    groupInviteCodeController.dispose();
     super.dispose();
   }
 }

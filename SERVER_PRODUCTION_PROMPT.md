@@ -276,6 +276,77 @@ Body：
 - 发送邀请邮件。
 - 返回 `DeviceInvite`，不要返回明文 token，除非 debug 环境显式启用。
 
+验证码规则：
+
+- 邮箱验证、密码找回、设备邀请接受都使用 6 位数字或大写字母验证码，例如 `A7K2P9`。
+- 数据库只存验证码 hash，不存明文。
+- 验证码有效期建议 10 分钟，最多尝试 5 次，超过后作废。
+- 邮件中只展示 6 位验证码，不展示长 token 链接；App 由用户手动输入验证码。
+
+### 6.1 家庭组 / 好友组共享
+
+账号组层级用于“一个人绑定设备后，同组账号都可以异地控制共享设备”。App 当前按以下接口接入；若服务端字段命名不同，以服务端实际实现为准。
+
+`account_groups` 表：
+
+- `group_id TEXT PRIMARY KEY`
+- `name TEXT NOT NULL`
+- `kind TEXT NOT NULL`，只允许 `family` 或 `friends`
+- `owner_user_id TEXT NOT NULL`
+- `created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
+
+`account_group_members` 表：
+
+- `group_id TEXT NOT NULL`
+- `user_id TEXT NOT NULL`
+- `role TEXT NOT NULL`，只允许 `owner`、`admin`、`member`
+- `created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
+- 唯一索引：`(group_id, user_id)`
+
+`account_group_invites` 表：
+
+- `invite_id TEXT PRIMARY KEY`
+- `group_id TEXT NOT NULL`
+- `email TEXT NOT NULL`
+- `role TEXT NOT NULL`
+- `code_hash TEXT NOT NULL`
+- `expires_at TEXT NOT NULL`
+- `accepted_at TEXT`
+- `created_by_user_id TEXT NOT NULL`
+- `created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
+
+`group_device_shares` 表：
+
+- `group_id TEXT NOT NULL`
+- `device_id TEXT NOT NULL`
+- `role TEXT NOT NULL`，只允许 `admin` 或 `viewer`
+- `created_by_user_id TEXT NOT NULL`
+- `created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
+- 唯一索引：`(group_id, device_id)`
+
+App 已接入接口：
+
+```http
+GET /api/me/groups
+POST /api/me/groups
+PATCH /api/me/groups/{group_id}
+DELETE /api/me/groups/{group_id}
+GET /api/me/groups/{group_id}/members
+POST /api/me/groups/{group_id}/invites
+POST /api/me/group-invites/accept
+GET /api/me/groups/{group_id}/devices
+POST /api/me/groups/{group_id}/devices
+DELETE /api/me/groups/{group_id}/devices/{device_id}
+```
+
+权限规则：
+
+- 创建组要求用户邮箱已验证。
+- `owner/admin` 可以邀请成员、把自己有权限的设备共享到组。
+- 设备 owner 始终保留最高权限；组共享只授予组成员访问/控制权，不转移设备归属。
+- `GET /api/me/devices` 返回用户自有设备、被单设备邀请共享的设备、所在组共享的设备，并附带 `share_source`：`owner`、`device_invite` 或 `group`。
+- `POST /api/me/devices/{device_id}/assign` 允许设备 owner、设备 admin、组 admin 控制；viewer 只读。
+
 新增：
 
 ```http

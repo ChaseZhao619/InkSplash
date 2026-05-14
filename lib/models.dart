@@ -171,6 +171,9 @@ class AppDevice {
     required this.deviceId,
     this.nickname,
     this.role,
+    this.shareSource,
+    this.groupId,
+    this.groupName,
     this.currentImageId,
     this.currentVersion,
     this.updatedAt,
@@ -185,6 +188,9 @@ class AppDevice {
   final String deviceId;
   final String? nickname;
   final String? role;
+  final String? shareSource;
+  final String? groupId;
+  final String? groupName;
   final String? currentImageId;
   final int? currentVersion;
   final String? updatedAt;
@@ -200,6 +206,9 @@ class AppDevice {
       deviceId: _string(json['device_id']),
       nickname: _nullableString(json['nickname']),
       role: _nullableString(json['role']),
+      shareSource: _nullableString(json['share_source']),
+      groupId: _nullableString(json['group_id']),
+      groupName: _nullableString(json['group_name']),
       currentImageId: _nullableString(json['current_image_id']),
       currentVersion: _nullableInt(json['current_version']),
       updatedAt: _nullableString(json['updated_at']),
@@ -264,6 +273,87 @@ class DeviceInvite {
       expiresAt: _nullableString(json['expires_at']),
       createdAt: _nullableString(json['created_at']),
       token: _nullableString(json['token']),
+    );
+  }
+}
+
+class AccountGroup {
+  const AccountGroup({
+    required this.groupId,
+    required this.name,
+    required this.kind,
+    required this.role,
+    this.createdAt,
+  });
+
+  final String groupId;
+  final String name;
+  final String kind;
+  final String role;
+  final String? createdAt;
+
+  factory AccountGroup.fromJson(Map<String, dynamic> json) {
+    return AccountGroup(
+      groupId: _string(json['group_id'] ?? json['id']),
+      name: _string(json['name']),
+      kind: _string(json['kind'], fallback: 'family'),
+      role: _string(json['role'], fallback: 'member'),
+      createdAt: _nullableString(json['created_at']),
+    );
+  }
+}
+
+class AccountGroupMember {
+  const AccountGroupMember({
+    required this.userId,
+    required this.email,
+    required this.role,
+    this.createdAt,
+  });
+
+  final String userId;
+  final String email;
+  final String role;
+  final String? createdAt;
+
+  factory AccountGroupMember.fromJson(Map<String, dynamic> json) {
+    return AccountGroupMember(
+      userId: _string(json['user_id'] ?? json['id']),
+      email: _string(json['email']),
+      role: _string(json['role'], fallback: 'member'),
+      createdAt: _nullableString(json['created_at']),
+    );
+  }
+}
+
+class AccountGroupInvite {
+  const AccountGroupInvite({
+    required this.inviteId,
+    required this.groupId,
+    required this.email,
+    required this.role,
+    this.expiresAt,
+    this.createdAt,
+    this.code,
+  });
+
+  final String inviteId;
+  final String groupId;
+  final String email;
+  final String role;
+  final String? expiresAt;
+  final String? createdAt;
+  final String? code;
+
+  factory AccountGroupInvite.fromJson(Map<String, dynamic> json) {
+    return AccountGroupInvite(
+      inviteId: _string(json['invite_id']),
+      groupId: _string(json['group_id']),
+      email: _string(json['email']),
+      role: _string(json['role'], fallback: 'member'),
+      expiresAt: _nullableString(json['expires_at']),
+      createdAt: _nullableString(json['created_at']),
+      code: _nullableString(json['code'] ?? json['token']),
     );
   }
 }

@@ -8,7 +8,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('shows redesigned home and empty states in English', (
+  testWidgets('starts at the English login page when signed out', (
     WidgetTester tester,
   ) async {
     tester.platformDispatcher.localeTestValue = const Locale('en');
@@ -18,39 +18,39 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('InkSplash'), findsOneWidget);
-    expect(find.text('Home'), findsOneWidget);
-    expect(find.text('Devices'), findsOneWidget);
-    expect(find.text('Current canvas'), findsOneWidget);
-    expect(find.text('No image preview yet'), findsOneWidget);
-    expect(find.text('Select or bind a device first.'), findsOneWidget);
+    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.text('Login'), findsOneWidget);
+    expect(find.text('No account? Create one'), findsOneWidget);
+    expect(find.text('Forgot password'), findsOneWidget);
+    expect(find.text('Home'), findsNothing);
   });
 
-  testWidgets('can switch language from settings to Chinese', (
+  testWidgets('register and forgot password are secondary auth views', (
     WidgetTester tester,
   ) async {
-    await tester.binding.setSurfaceSize(const Size(900, 1200));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
     tester.platformDispatcher.localeTestValue = const Locale('en');
     addTearDown(tester.platformDispatcher.clearLocaleTestValue);
 
     await tester.pumpWidget(const InkSplashApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Settings'));
+    await tester.tap(find.text('No account? Create one'));
     await tester.pumpAndSettle();
-    expect(find.text('Cloud account'), findsOneWidget);
-    expect(find.text('Login'), findsOneWidget);
+    expect(find.text('Create account'), findsWidgets);
+    expect(find.text('Already have an account? Sign in'), findsOneWidget);
 
-    await tester.tap(find.text('中文'));
+    await tester.tap(find.text('Forgot password'));
     await tester.pumpAndSettle();
-
-    expect(find.text('首页'), findsOneWidget);
-    expect(find.text('设备'), findsOneWidget);
-    expect(find.text('云端账号'), findsOneWidget);
-    expect(find.text('登录'), findsOneWidget);
+    expect(find.text('Send code'), findsOneWidget);
+    expect(find.text('6-character code'), findsNothing);
+    expect(find.text('Reset code'), findsOneWidget);
+    expect(
+      find.text('Enter the 6 letters or digits from your email.'),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('follows Chinese system locale by default', (
+  testWidgets('follows Chinese system locale on the login page', (
     WidgetTester tester,
   ) async {
     tester.platformDispatcher.localesTestValue = const [Locale('zh')];
@@ -61,8 +61,9 @@ void main() {
     await tester.pumpWidget(const InkSplashApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('首页'), findsOneWidget);
-    expect(find.text('当前画布'), findsOneWidget);
-    expect(find.text('还没有图片预览'), findsOneWidget);
+    expect(find.text('欢迎回来'), findsOneWidget);
+    expect(find.text('登录'), findsOneWidget);
+    expect(find.text('没有账号？去注册'), findsOneWidget);
+    expect(find.text('忘记密码'), findsOneWidget);
   });
 }
