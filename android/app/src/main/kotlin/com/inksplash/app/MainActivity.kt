@@ -4,6 +4,7 @@ import android.Manifest
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.le.ScanResult
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -50,6 +51,7 @@ class MainActivity : FlutterActivity() {
                 "provisionWifi" -> provisionWifi(call, result)
                 "disconnect" -> {
                     provisionManager.espDevice?.disconnectDevice()
+                    releaseProvisioningNetwork()
                     result.success(null)
                 }
                 else -> result.notImplemented()
@@ -332,6 +334,13 @@ class MainActivity : FlutterActivity() {
             "Failed to connect to ESP device. For SoftAP without a password, connect the phone to the device hotspot in system Wi-Fi settings first."
         } else {
             "Failed to connect to ESP device: $details"
+        }
+    }
+
+    private fun releaseProvisioningNetwork() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val connectivityManager = getSystemService(ConnectivityManager::class.java)
+            connectivityManager.bindProcessToNetwork(null)
         }
     }
 

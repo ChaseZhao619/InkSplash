@@ -470,7 +470,40 @@ class AppController extends ChangeNotifier {
         ssid: wifi.ssid,
         password: wifiPasswordController.text,
       );
-      final claimed = await _deviceService
+      if (payload.isSoftAp) {
+        await _releaseSoftApNetwork();
+      }
+      final claimed = await _claimDeviceWithNetworkRetry(
+        s: s,
+        token: token,
+        payload: payload,
+      );
+      final loadedDevices = await _listDevicesWithNetworkRetry(token);
+      devices = loadedDevices;
+      selectedDevice = loadedDevices.firstWhere(
+        (device) => device.deviceId == claimed.deviceId,
+        orElse: () => claimed,
+      );
+    });
+  }
+
+  Future<void> _releaseSoftApNetwork() async {
+    try {
+      await _provisioning.disconnect();
+    } catch (_) {
+      // The ESP may reboot immediately after provisioning; the cloud claim can
+      // continue as long as Android releases the SoftAP network binding.
+    }
+    await Future<void>.delayed(const Duration(seconds: 3));
+  }
+
+  Future<AppDevice> _claimDeviceWithNetworkRetry({
+    required AppStrings s,
+    required String token,
+    required ProvisioningQrPayload payload,
+  }) async {
+    Future<AppDevice> claim() {
+      return _deviceService
           .claimDevice(
             bearerToken: token,
             deviceId: payload.deviceId,
@@ -490,13 +523,25 @@ class AppController extends ChangeNotifier {
             }
             throw error;
           });
-      final loadedDevices = await _deviceService.listDevices(token);
-      devices = loadedDevices;
-      selectedDevice = loadedDevices.firstWhere(
-        (device) => device.deviceId == claimed.deviceId,
-        orElse: () => claimed,
-      );
-    });
+    }
+
+    try {
+      return await claim();
+    } on ApiError {
+      rethrow;
+    } catch (_) {
+      await Future<void>.delayed(const Duration(seconds: 3));
+      return claim();
+    }
+  }
+
+  Future<List<AppDevice>> _listDevicesWithNetworkRetry(String token) async {
+    try {
+      return await _deviceService.listDevices(token);
+    } catch (_) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      return _deviceService.listDevices(token);
+    }
   }
 
   Future<void> uploadAndAssign(AppStrings s) async {
