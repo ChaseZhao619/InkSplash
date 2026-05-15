@@ -788,6 +788,15 @@ class _AddDevicePage extends StatelessWidget {
                 if (payload.isSoftAp) ...[
                   Text(s.softApHint),
                   const SizedBox(height: 10),
+                  TextField(
+                    controller: controller.softApPasswordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: s.softApPassword,
+                      helperText: s.softApPasswordHelp,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                 ],
                 OutlinedButton.icon(
                   onPressed: () => controller.searchProvisioningDevice(s),

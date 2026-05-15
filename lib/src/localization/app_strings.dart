@@ -99,8 +99,13 @@ class AppStrings {
   String get connectSoftApDevice =>
       isZh ? '连接 SoftAP 设备' : 'Connect SoftAP device';
   String get softApHint => isZh
-      ? '请确保手机允许 App 加入设备热点，热点名称应与二维码 name 一致。'
-      : 'Allow the app to join the device hotspot. The hotspot SSID should match the QR name.';
+      ? '如果设备热点没有密码，请先到系统 Wi-Fi 设置手动连接该热点，再返回 App 继续。若设备热点有密码，请在下方输入。'
+      : 'If the device hotspot has no password, connect to it in system Wi-Fi settings first, then return here. If it has a password, enter it below.';
+  String get softApPassword =>
+      isZh ? 'SoftAP 热点密码（可选）' : 'SoftAP password (optional)';
+  String get softApPasswordHelp => isZh
+      ? '留空表示手机已经手动连接到设备热点。'
+      : 'Leave empty when the phone is already connected to the device hotspot.';
   String get noServiceUuid => isZh ? '无 Service UUID' : 'No service UUID';
   String get connect => isZh ? '连接' : 'Connect';
   String get wifiNetwork => isZh ? 'Wi-Fi 网络' : 'Wi-Fi network';

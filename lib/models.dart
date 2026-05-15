@@ -66,6 +66,7 @@ class ProvisioningQrPayload {
     required this.proofOfPossession,
     required this.deviceId,
     required this.claimCode,
+    this.softApPassword,
   });
 
   final String version;
@@ -75,6 +76,7 @@ class ProvisioningQrPayload {
   final String proofOfPossession;
   final String deviceId;
   final String claimCode;
+  final String? softApPassword;
 
   String get devicePrefix {
     final underscore = name.indexOf('_');
@@ -116,6 +118,11 @@ class ProvisioningQrPayload {
       proofOfPossession: _string(decoded['pop']).trim(),
       deviceId: _string(decoded['device_id']).trim(),
       claimCode: _string(decoded['claim_code']).trim(),
+      softApPassword: _nullableString(
+        decoded['softap_password'] ??
+            decoded['soft_ap_password'] ??
+            decoded['ap_password'],
+      ),
     );
     if (payload.version != 'v1') {
       throw FormatException('不支持的二维码版本：${payload.version}');

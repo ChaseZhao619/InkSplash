@@ -74,7 +74,7 @@ class MainActivity : FlutterActivity() {
             }
             ESPConstants.EVENT_DEVICE_CONNECTION_FAILED -> {
                 pendingConnectResult = null
-                result.error("connect_failed", "Failed to connect to ESP device", null)
+                result.error("connect_failed", connectionFailureMessage(event), null)
             }
             ESPConstants.EVENT_DEVICE_DISCONNECTED -> {
                 if (pendingConnectResult != null) {
@@ -179,6 +179,7 @@ class MainActivity : FlutterActivity() {
 
     private fun searchSoftApDevices(call: MethodCall, result: MethodChannel.Result) {
         val prefix = call.argument<String>("prefix") ?: "PROV_"
+        val expectedName = call.argument<String>("name") ?: prefix
         scannedSoftApDevices.clear()
         provisionManager.createESPDevice(
             ESPConstants.TransportType.TRANSPORT_SOFTAP,
@@ -190,6 +191,17 @@ class MainActivity : FlutterActivity() {
                     if (accessPoint.wifiName.startsWith(prefix)) {
                         scannedSoftApDevices[accessPoint.wifiName] = accessPoint
                     }
+                }
+                if (scannedSoftApDevices.isEmpty() && expectedName.isNotBlank()) {
+                    result.success(listOf(
+                        mapOf(
+                            "name" to expectedName,
+                            "serviceUuid" to "",
+                            "rssi" to null,
+                            "security" to null
+                        )
+                    ))
+                    return
                 }
                 val devices = scannedSoftApDevices.map { (name, accessPoint) ->
                     mapOf(
@@ -214,8 +226,8 @@ class MainActivity : FlutterActivity() {
         val password = call.argument<String>("password") ?: ""
         val security = call.argument<Int>("security") ?: 1
         val accessPoint = scannedSoftApDevices[name]
-        if (name == null || accessPoint == null) {
-            result.error("device_not_found", "Device was not found in the last SoftAP scan", null)
+        if (name == null) {
+            result.error("device_not_found", "SoftAP device name is required", null)
             return
         }
         provisionManager.createESPDevice(
@@ -223,7 +235,10 @@ class MainActivity : FlutterActivity() {
             if (security == 0) ESPConstants.SecurityType.SECURITY_0 else ESPConstants.SecurityType.SECURITY_1
         )
         provisionManager.espDevice.setProofOfPossession(proofOfPossession)
-        provisionManager.espDevice.setWifiDevice(accessPoint)
+        provisionManager.espDevice.setDeviceName(name)
+        if (accessPoint != null) {
+            provisionManager.espDevice.setWifiDevice(accessPoint)
+        }
         pendingConnectResult = result
         if (password.isEmpty()) {
             provisionManager.espDevice.connectWiFiDevice()
@@ -308,6 +323,16 @@ class MainActivity : FlutterActivity() {
             permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
         }
         return permissions
+    }
+
+    private fun connectionFailureMessage(event: DeviceConnectionEvent): String {
+        val data = event.data ?: return "Failed to connect to ESP device. For SoftAP without a password, connect the phone to the device hotspot in system Wi-Fi settings first."
+        val details = data.keySet().joinToString(", ") { key -> "$key=${data.get(key)}" }
+        return if (details.isBlank()) {
+            "Failed to connect to ESP device. For SoftAP without a password, connect the phone to the device hotspot in system Wi-Fi settings first."
+        } else {
+            "Failed to connect to ESP device: $details"
+        }
     }
 
     private data class ScannedDevice(

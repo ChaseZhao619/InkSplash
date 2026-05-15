@@ -28,6 +28,7 @@ class AppController extends ChangeNotifier {
   final deviceNicknameController = TextEditingController();
   final renameController = TextEditingController();
   final wifiPasswordController = TextEditingController();
+  final softApPasswordController = TextEditingController();
   final verifyEmailTokenController = TextEditingController();
   final resetEmailController = TextEditingController();
   final resetTokenController = TextEditingController();
@@ -398,6 +399,7 @@ class AppController extends ChangeNotifier {
     try {
       final payload = ProvisioningQrPayload.fromRaw(raw);
       qrPayload = payload;
+      softApPasswordController.text = payload.softApPassword ?? '';
       provisioningDevices = const [];
       wifiNetworks = const [];
       selectedWifi = null;
@@ -439,6 +441,7 @@ class AppController extends ChangeNotifier {
           await _provisioning.connectSoftApDevice(
             name: device.name,
             proofOfPossession: payload.proofOfPossession,
+            password: softApPasswordController.text,
             security: payload.security,
           );
         } else {
@@ -687,6 +690,7 @@ class AppController extends ChangeNotifier {
     deviceNicknameController.dispose();
     renameController.dispose();
     wifiPasswordController.dispose();
+    softApPasswordController.dispose();
     verifyEmailTokenController.dispose();
     resetEmailController.dispose();
     resetTokenController.dispose();
