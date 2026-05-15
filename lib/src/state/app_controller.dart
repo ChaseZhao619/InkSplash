@@ -448,14 +448,26 @@ class AppController extends ChangeNotifier {
         ssid: wifi.ssid,
         password: wifiPasswordController.text,
       );
-      final claimed = await _deviceService.claimDevice(
-        bearerToken: token,
-        deviceId: payload.deviceId,
-        claimCode: payload.claimCode,
-        nickname: deviceNicknameController.text.trim().isEmpty
-            ? null
-            : deviceNicknameController.text.trim(),
-      );
+      final claimed = await _deviceService
+          .claimDevice(
+            bearerToken: token,
+            deviceId: payload.deviceId,
+            claimCode: payload.claimCode,
+            nickname: deviceNicknameController.text.trim().isEmpty
+                ? null
+                : deviceNicknameController.text.trim(),
+          )
+          .catchError((Object error) {
+            if (error is ApiError &&
+                error.statusCode == 401 &&
+                error.message.toLowerCase().contains('claim')) {
+              throw ApiError(
+                s.invalidClaimCodeHelp,
+                statusCode: error.statusCode,
+              );
+            }
+            throw error;
+          });
       final loadedDevices = await _deviceService.listDevices(token);
       devices = loadedDevices;
       selectedDevice = loadedDevices.firstWhere(

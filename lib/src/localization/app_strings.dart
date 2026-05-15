@@ -160,6 +160,9 @@ class AppStrings {
   String get selectBindDeviceFirst =>
       isZh ? '请先选择或绑定设备。' : 'Select or bind a device first.';
   String get invalidQrPayload => isZh ? '二维码无效' : 'Invalid QR payload';
+  String get invalidClaimCodeHelp => isZh
+      ? '设备绑定码无效或已使用。请确认二维码里的 device_id 和 claim_code 与服务端设备记录一致；如果设备已绑定过，需要在服务端重新生成 claim_code 并更新二维码。'
+      : 'Device claim code is invalid or already used. Confirm the QR device_id and claim_code match the server device record. If this device was bound before, regenerate the claim_code on the server and update the QR code.';
   String completed(String action) => isZh ? '$action 已完成' : '$action completed';
   String failed(String action, Object error) =>
       isZh ? '$action 失败：$error' : '$action failed: $error';

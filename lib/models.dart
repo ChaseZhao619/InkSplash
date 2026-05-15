@@ -92,23 +92,23 @@ class ProvisioningQrPayload {
       throw const FormatException('二维码内容必须是 JSON 对象');
     }
     final missing = <String>[
-      if (_string(decoded['ver']).isEmpty) 'ver',
-      if (_string(decoded['name']).isEmpty) 'name',
-      if (_string(decoded['pop']).isEmpty) 'pop',
-      if (_string(decoded['device_id']).isEmpty) 'device_id',
-      if (_string(decoded['claim_code']).isEmpty) 'claim_code',
+      if (_string(decoded['ver']).trim().isEmpty) 'ver',
+      if (_string(decoded['name']).trim().isEmpty) 'name',
+      if (_string(decoded['pop']).trim().isEmpty) 'pop',
+      if (_string(decoded['device_id']).trim().isEmpty) 'device_id',
+      if (_string(decoded['claim_code']).trim().isEmpty) 'claim_code',
     ];
     if (missing.isNotEmpty) {
       throw FormatException('二维码缺少字段：${missing.join(', ')}');
     }
     final payload = ProvisioningQrPayload(
-      version: _string(decoded['ver']),
-      name: _string(decoded['name']),
-      transport: _string(decoded['transport']),
+      version: _string(decoded['ver']).trim(),
+      name: _string(decoded['name']).trim(),
+      transport: _string(decoded['transport']).trim(),
       security: _int(decoded['security'], fallback: 1),
-      proofOfPossession: _string(decoded['pop']),
-      deviceId: _string(decoded['device_id']),
-      claimCode: _string(decoded['claim_code']),
+      proofOfPossession: _string(decoded['pop']).trim(),
+      deviceId: _string(decoded['device_id']).trim(),
+      claimCode: _string(decoded['claim_code']).trim(),
     );
     if (payload.version != 'v1') {
       throw FormatException('不支持的二维码版本：${payload.version}');
