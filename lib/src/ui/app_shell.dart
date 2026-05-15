@@ -767,25 +767,46 @@ class _AddDevicePage extends StatelessWidget {
               if (payload != null) ...[
                 const SizedBox(height: 16),
                 _StepHeader(index: 1, text: s.scanDeviceQr),
-                _KeyValue(label: s.bleName, value: payload.name),
+                _KeyValue(
+                  label: payload.isSoftAp ? s.softApName : s.bleName,
+                  value: payload.name,
+                ),
                 _KeyValue(label: s.deviceId, value: payload.deviceId),
+                _KeyValue(label: s.transport, value: payload.transport),
                 const SizedBox(height: 12),
                 TextField(
                   controller: controller.deviceNicknameController,
                   decoration: InputDecoration(labelText: s.nickname),
                 ),
                 const SizedBox(height: 16),
-                _StepHeader(index: 2, text: s.searchBleDevice),
+                _StepHeader(
+                  index: 2,
+                  text: payload.isSoftAp
+                      ? s.searchSoftApDevice
+                      : s.searchBleDevice,
+                ),
+                if (payload.isSoftAp) ...[
+                  Text(s.softApHint),
+                  const SizedBox(height: 10),
+                ],
                 OutlinedButton.icon(
                   onPressed: () => controller.searchProvisioningDevice(s),
-                  icon: const Icon(Icons.bluetooth_searching),
-                  label: Text(s.searchBleDevice),
+                  icon: Icon(
+                    payload.isSoftAp
+                        ? Icons.wifi_tethering
+                        : Icons.bluetooth_searching,
+                  ),
+                  label: Text(
+                    payload.isSoftAp ? s.searchSoftApDevice : s.searchBleDevice,
+                  ),
                 ),
               ],
               for (final device in controller.provisioningDevices)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.bluetooth),
+                  leading: Icon(
+                    payload?.isSoftAp == true ? Icons.wifi : Icons.bluetooth,
+                  ),
                   title: Text(device.name),
                   subtitle: Text(device.serviceUuid ?? s.noServiceUuid),
                   trailing: IconButton(

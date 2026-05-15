@@ -29,8 +29,12 @@ import ESPProvision
         result(true)
       case "searchBleDevices":
         self.searchBleDevices(call: call, result: result)
+      case "searchSoftApDevices":
+        self.searchSoftApDevices(call: call, result: result)
       case "connectBleDevice":
         self.connectBleDevice(call: call, result: result)
+      case "connectSoftApDevice":
+        self.connectSoftApDevice(call: call, result: result)
       case "scanWifiNetworks":
         self.scanWifiNetworks(result: result)
       case "provisionWifi":
@@ -94,6 +98,56 @@ import ESPProvision
         result(FlutterError(code: "disconnected", message: "ESP device disconnected", details: nil))
       case .failedToConnect(let error):
         result(FlutterError(code: "connect_failed", message: error.description, details: nil))
+      }
+    }
+  }
+
+  private func searchSoftApDevices(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    let args = call.arguments as? [String: Any]
+    let prefix = args?["prefix"] as? String ?? "PROV_"
+    let name = args?["name"] as? String ?? prefix
+    result([[
+      "name": name,
+      "serviceUuid": "",
+      "rssi": 0
+    ]])
+  }
+
+  private func connectSoftApDevice(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    let args = call.arguments as? [String: Any]
+    guard let name = args?["name"] as? String else {
+      result(FlutterError(code: "device_not_found", message: "SoftAP device name is required", details: nil))
+      return
+    }
+    pendingProofOfPossession = args?["proofOfPossession"] as? String ?? ""
+    let password = args?["password"] as? String ?? ""
+    let securityValue = args?["security"] as? Int ?? 1
+    let security: ESPSecurity = securityValue == 0 ? .unsecure : .secure
+    ESPProvisionManager.shared.createESPDevice(
+      deviceName: name,
+      transport: .softap,
+      security: security,
+      proofOfPossession: pendingProofOfPossession,
+      softAPPassword: password
+    ) { [weak self] device, error in
+      if let error {
+        result(FlutterError(code: "softap_create_failed", message: error.description, details: nil))
+        return
+      }
+      guard let self, let device else {
+        result(FlutterError(code: "softap_create_failed", message: "SoftAP device could not be created", details: nil))
+        return
+      }
+      self.currentDevice = device
+      device.connect(delegate: self) { status in
+        switch status {
+        case .connected:
+          result(nil)
+        case .disconnected:
+          result(FlutterError(code: "disconnected", message: "ESP SoftAP device disconnected", details: nil))
+        case .failedToConnect(let error):
+          result(FlutterError(code: "connect_failed", message: error.description, details: nil))
+        }
       }
     }
   }

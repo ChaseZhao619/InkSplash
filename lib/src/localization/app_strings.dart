@@ -90,8 +90,17 @@ class AppStrings {
   String get provisionBind => isZh ? '配网与绑定' : 'Provision and bind';
   String get scanDeviceQr => isZh ? '扫描设备二维码' : 'Scan device QR';
   String get bleName => isZh ? 'BLE 名称' : 'BLE name';
+  String get softApName => isZh ? 'SoftAP 名称' : 'SoftAP name';
   String get deviceId => isZh ? '设备 ID' : 'Device ID';
+  String get transport => isZh ? '传输方式' : 'Transport';
   String get searchBleDevice => isZh ? '搜索 BLE 设备' : 'Search BLE device';
+  String get searchSoftApDevice =>
+      isZh ? '搜索 SoftAP 设备' : 'Search SoftAP device';
+  String get connectSoftApDevice =>
+      isZh ? '连接 SoftAP 设备' : 'Connect SoftAP device';
+  String get softApHint => isZh
+      ? '请确保手机允许 App 加入设备热点，热点名称应与二维码 name 一致。'
+      : 'Allow the app to join the device hotspot. The hotspot SSID should match the QR name.';
   String get noServiceUuid => isZh ? '无 Service UUID' : 'No service UUID';
   String get connect => isZh ? '连接' : 'Connect';
   String get wifiNetwork => isZh ? 'Wi-Fi 网络' : 'Wi-Fi network';
@@ -161,8 +170,8 @@ class AppStrings {
       isZh ? '请先选择或绑定设备。' : 'Select or bind a device first.';
   String get invalidQrPayload => isZh ? '二维码无效' : 'Invalid QR payload';
   String get invalidClaimCodeHelp => isZh
-      ? '设备绑定码无效或已使用。请确认二维码里的 device_id 和 claim_code 与服务端设备记录一致；如果设备已绑定过，需要在服务端重新生成 claim_code 并更新二维码。'
-      : 'Device claim code is invalid or already used. Confirm the QR device_id and claim_code match the server device record. If this device was bound before, regenerate the claim_code on the server and update the QR code.';
+      ? '设备绑定码无效或设备已被绑定。请确认二维码里的 device_id 和 claim_code 来自同一台设备，且服务端使用了正确的 DEVICE_CLAIM_HMAC_SECRET。'
+      : 'Device claim code is invalid or the device is already bound. Confirm the QR device_id and claim_code come from the same device and the server uses the correct DEVICE_CLAIM_HMAC_SECRET.';
   String completed(String action) => isZh ? '$action 已完成' : '$action completed';
   String failed(String action, Object error) =>
       isZh ? '$action 失败：$error' : '$action failed: $error';
@@ -192,6 +201,8 @@ class AppStrings {
       isZh ? '共享设备到组' : 'Share device to group';
   String get bleSearchAction => isZh ? '搜索 BLE' : 'BLE search';
   String get bleConnectAction => isZh ? '连接 BLE' : 'BLE connect';
+  String get softApSearchAction => isZh ? '搜索 SoftAP' : 'SoftAP search';
+  String get softApConnectAction => isZh ? '连接 SoftAP' : 'SoftAP connect';
   String get provisionClaimAction => isZh ? '配网绑定' : 'Provision and claim';
   String get uploadAssignAction => isZh ? '上传下发' : 'Upload and assign';
   String get savedLoginExpired => isZh ? '已保存登录已过期' : 'Saved login expired';

@@ -27,6 +27,7 @@ class MainActivity : FlutterActivity() {
     private val permissionRequestCode = 8119
     private val handler = Handler(Looper.getMainLooper())
     private val scannedDevices = mutableMapOf<String, ScannedDevice>()
+    private val scannedSoftApDevices = mutableMapOf<String, WiFiAccessPoint>()
     private val pendingPermissionResults = mutableListOf<MethodChannel.Result>()
 
     private lateinit var provisionManager: ESPProvisionManager
@@ -42,7 +43,9 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "requestPermissions" -> requestProvisioningPermissions(result)
                 "searchBleDevices" -> searchBleDevices(call, result)
+                "searchSoftApDevices" -> searchSoftApDevices(call, result)
                 "connectBleDevice" -> connectBleDevice(call, result)
+                "connectSoftApDevice" -> connectSoftApDevice(call, result)
                 "scanWifiNetworks" -> scanWifiNetworks(result)
                 "provisionWifi" -> provisionWifi(call, result)
                 "disconnect" -> {
@@ -174,6 +177,67 @@ class MainActivity : FlutterActivity() {
         }, 30000)
     }
 
+    private fun searchSoftApDevices(call: MethodCall, result: MethodChannel.Result) {
+        val prefix = call.argument<String>("prefix") ?: "PROV_"
+        scannedSoftApDevices.clear()
+        provisionManager.createESPDevice(
+            ESPConstants.TransportType.TRANSPORT_SOFTAP,
+            ESPConstants.SecurityType.SECURITY_1
+        )
+        provisionManager.searchWiFiEspDevices(prefix, object : WiFiScanListener {
+            override fun onWifiListReceived(wifiList: ArrayList<WiFiAccessPoint>) {
+                wifiList.forEach { accessPoint ->
+                    if (accessPoint.wifiName.startsWith(prefix)) {
+                        scannedSoftApDevices[accessPoint.wifiName] = accessPoint
+                    }
+                }
+                val devices = scannedSoftApDevices.map { (name, accessPoint) ->
+                    mapOf(
+                        "name" to name,
+                        "serviceUuid" to "",
+                        "rssi" to accessPoint.rssi,
+                        "security" to accessPoint.security
+                    )
+                }
+                result.success(devices)
+            }
+
+            override fun onWiFiScanFailed(e: Exception) {
+                result.error("softap_scan_failed", e.message ?: "SoftAP scan failed", null)
+            }
+        })
+    }
+
+    private fun connectSoftApDevice(call: MethodCall, result: MethodChannel.Result) {
+        val name = call.argument<String>("name")
+        val proofOfPossession = call.argument<String>("proofOfPossession") ?: ""
+        val password = call.argument<String>("password") ?: ""
+        val security = call.argument<Int>("security") ?: 1
+        val accessPoint = scannedSoftApDevices[name]
+        if (name == null || accessPoint == null) {
+            result.error("device_not_found", "Device was not found in the last SoftAP scan", null)
+            return
+        }
+        provisionManager.createESPDevice(
+            ESPConstants.TransportType.TRANSPORT_SOFTAP,
+            if (security == 0) ESPConstants.SecurityType.SECURITY_0 else ESPConstants.SecurityType.SECURITY_1
+        )
+        provisionManager.espDevice.setProofOfPossession(proofOfPossession)
+        provisionManager.espDevice.setWifiDevice(accessPoint)
+        pendingConnectResult = result
+        if (password.isEmpty()) {
+            provisionManager.espDevice.connectWiFiDevice()
+        } else {
+            provisionManager.espDevice.connectWiFiDevice(name, password)
+        }
+        handler.postDelayed({
+            pendingConnectResult?.let {
+                pendingConnectResult = null
+                it.error("connect_timeout", "Timed out while connecting to ESP SoftAP device", null)
+            }
+        }, 30000)
+    }
+
     private fun scanWifiNetworks(result: MethodChannel.Result) {
         provisionManager.espDevice.scanNetworks(object : WiFiScanListener {
             override fun onWifiListReceived(wifiList: ArrayList<WiFiAccessPoint>) {
@@ -229,7 +293,9 @@ class MainActivity : FlutterActivity() {
     private fun requiredPermissions(): List<String> {
         val permissions = mutableListOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.CAMERA
+            Manifest.permission.CAMERA,
+            Manifest.permission.ACCESS_WIFI_STATE,
+            Manifest.permission.CHANGE_WIFI_STATE
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             permissions.add(Manifest.permission.BLUETOOTH_SCAN)
@@ -237,6 +303,9 @@ class MainActivity : FlutterActivity() {
         } else {
             permissions.add(Manifest.permission.BLUETOOTH)
             permissions.add(Manifest.permission.BLUETOOTH_ADMIN)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
         }
         return permissions
     }

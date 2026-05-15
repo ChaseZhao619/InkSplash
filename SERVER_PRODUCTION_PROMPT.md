@@ -1,330 +1,229 @@
-# 给服务端 Codex 的修改 Prompt
+# InkSplash 服务端最新生产需求
 
-请在 `ChaseZhao619/ePaperService` 服务端仓库中实现 InkSplash 私发正式版所需的后端改造。
+请在服务端实现 InkSplash App 所需的账号、设备绑定、设备共享、图片下发和 ESP32 轮询接口。本文档只描述当前最新需求。
 
-## 背景
+## 1. 核心原则
 
-当前服务端是 FastAPI + SQLite + 本地文件存储，已有能力包括：
+- App 支持 BLE 和 SoftAP 两种 ESP-IDF Wi-Fi Provisioning 配网方式。
+- 配网只负责让 ESP32 连上 Wi-Fi。
+- 设备绑定由 App 扫描二维码后调用云端完成。
+- App 不保存、不计算 HMAC 密钥。
+- 一个设备只能有一个 owner。
+- owner 可以通过家庭组或好友组把设备共享给其他账号共同管理。
+- ESP32 通过云端轮询获取图片，不要求 App 和 ESP32 保持长连接。
 
-- 邮箱密码注册/登录。
-- Bearer token。
-- App 用户 claim 设备。
-- 用户上传图片并 assign 到自己的设备。
-- ESP32 旧协议：
-  - `GET /api/devices/{device_id}/current`
-  - `GET /api/images/{image_id}/data`
-  - `POST /api/devices/{device_id}/status`
-- 管理员创建设备：
-  - `POST /api/devices/{device_id}`
+## 2. 服务端配置
 
-请保持旧 ESP32 协议兼容，不要破坏固件轮询、下载和状态上报。
+新增环境变量：
 
-## 总目标
+```text
+DEVICE_CLAIM_HMAC_SECRET=mqIJyxzd2cD3fMrZGBoSewYgX4LOTF7Q
+```
 
-把服务端升级为可供 InkSplash iOS/Android 私发版本使用的生产化后端：
+该密钥只允许存在于服务端、固件或生产工具中，不得返回给 App，不得写入 App。
 
-- HTTPS / 域名部署准备。
-- 邮箱验证。
-- 找回密码。
-- 家庭共享设备。
-- 设备成员权限。
-- 图片访问授权。
-- 设备状态历史接口。
-- 运维备份和日志改善。
+设备绑定码计算规则：
 
-不要凭空删除现有接口。新增接口要有测试，旧测试必须继续通过。
+```text
+claim_code = hex(first_16_bytes(HMAC_SHA256(DEVICE_CLAIM_HMAC_SECRET, device_id)))
+```
 
-## 具体要求
+说明：
 
-### 1. 用户邮箱验证
+- HMAC 输入固定使用 `device_id`。
+- 不使用二维码里的 `name` 作为 HMAC 输入。
+- 输出为 32 个小写十六进制字符。
+- 不再依赖每台设备预存 `claim_code_hash`。
 
-修改 `users` 表：
+## 3. 账号接口
 
-- 新增 `email_verified_at TEXT`
-- 新增 `updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
-
-新增 `email_verification_tokens` 表：
-
-- `token_hash TEXT PRIMARY KEY`
-- `user_id TEXT NOT NULL`
-- `expires_at TEXT NOT NULL`
-- `used_at TEXT`
-- `created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
-
-注册行为：
-
-- `POST /api/auth/register` 注册成功后创建邮箱验证 token。
-- 通过 SMTP 发送验证邮件。
-- 返回原有 `AuthResponse`，但 `User` response 需要新增：
-  - `email_verified: bool`
-  - `email_verified_at: string|null`
-
-新增接口：
+保留邮箱密码账号体系：
 
 ```http
+POST /api/auth/register
+POST /api/auth/login
+GET /api/me
 POST /api/auth/verify-email/request
-Authorization: Bearer <token>
-```
-
-行为：
-
-- 给当前登录用户重新发送验证邮件。
-- 如果已经验证，也返回 `{"status":"ok"}`。
-
-```http
 POST /api/auth/verify-email/confirm
-Content-Type: application/json
-```
-
-Body：
-
-```json
-{"token":"TOKEN"}
-```
-
-行为：
-
-- 校验 token hash、未过期、未使用。
-- 设置 `users.email_verified_at`。
-- 设置 token `used_at`。
-- 返回 `User`。
-
-### 2. 找回密码
-
-新增 `password_reset_tokens` 表：
-
-- `token_hash TEXT PRIMARY KEY`
-- `user_id TEXT NOT NULL`
-- `expires_at TEXT NOT NULL`
-- `used_at TEXT`
-- `created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
-
-新增接口：
-
-```http
 POST /api/auth/password-reset/request
-Content-Type: application/json
+POST /api/auth/password-reset/confirm
 ```
 
-Body：
+要求：
+
+- 注册和登录返回 Bearer token。
+- `GET /api/me` 返回当前用户信息，包括 `email_verified`。
+- 邮箱验证码、密码重置验证码使用 6 位数字或大写字母。
+- 验证码只存 hash，设置过期时间和最大尝试次数。
+- 用户写操作可以要求邮箱已验证，至少包括设备绑定、图片上传、图片下发和共享邀请。
+
+## 4. 设备数据模型
+
+设备表至少包含：
+
+```text
+device_id TEXT PRIMARY KEY
+device_token TEXT NOT NULL
+owner_user_id TEXT
+current_image_id TEXT
+current_version INTEGER NOT NULL DEFAULT 0
+nickname TEXT
+claimed_at TEXT
+last_seen_at TEXT
+last_status TEXT
+last_error TEXT
+battery_mv INTEGER
+rssi INTEGER
+created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+updated_at TEXT
+```
+
+说明：
+
+- `device_id` 必须和二维码、固件一致。
+- `device_token` 用于 ESP32 访问 `/current` 和 `/status`，不要放进二维码。
+- `owner_user_id` 为空表示未绑定。
+- 不需要保存 `claim_code_hash`；如果旧表已有该字段，可以保留但新逻辑不依赖它。
+
+## 5. 二维码格式
+
+App 支持纯 JSON，也支持 `data={...}` 外层格式。
+
+BLE 示例：
 
 ```json
-{"email":"user@example.com"}
+{
+  "ver": "v1",
+  "name": "PROV_C36AD8",
+  "transport": "ble",
+  "security": 1,
+  "pop": "abcd1234",
+  "device_id": "esp32_001",
+  "claim_code": "f095c9b448d55c929615763b09f54fef"
+}
 ```
 
-行为：
+SoftAP 示例：
 
-- 无论邮箱是否存在，都返回 `{"status":"ok"}`，避免枚举邮箱。
-- 如果用户存在，创建 reset token 并发送邮件。
+```json
+{
+  "ver": "v1",
+  "name": "PROV_C36AD8",
+  "transport": "softap",
+  "security": 1,
+  "pop": "abcd1234",
+  "device_id": "esp32_001",
+  "claim_code": "f095c9b448d55c929615763b09f54fef"
+}
+```
+
+字段要求：
+
+- `ver` 固定为 `v1`。
+- `transport` 只允许 `ble` 或 `softap`。
+- `security` 当前支持 `0` 或 `1`，推荐 `1`。
+- `name` 是 BLE 广播名或 SoftAP SSID。
+- `pop` 是 ESP-IDF provisioning 的 Proof of Possession。
+- `device_id` 是云端设备 ID。
+- `claim_code` 是按第 2 节规则计算出的 32 位 hex 字符串。
+
+## 6. 设备绑定接口
+
+App 配网成功后调用：
 
 ```http
-POST /api/auth/password-reset/confirm
+POST /api/me/devices/claim
+Authorization: Bearer <token>
 Content-Type: application/json
 ```
 
-Body：
+请求：
 
 ```json
-{"token":"TOKEN","new_password":"new-password"}
+{
+  "device_id": "esp32_001",
+  "claim_code": "f095c9b448d55c929615763b09f54fef",
+  "nickname": "客厅墨水屏"
+}
 ```
 
-行为：
+服务端校验：
 
-- 校验 token hash、未过期、未使用。
-- 新密码沿用当前密码规则：至少 8 位。
-- 更新 `users.password_hash`。
-- 设置 token `used_at`。
-- 返回 `{"status":"ok"}`。
+- 用户必须登录。
+- 如启用邮箱验证策略，用户必须已验证邮箱。
+- `device_id` 必须存在。
+- 设备 `owner_user_id` 必须为空。
+- 服务端用 `DEVICE_CLAIM_HMAC_SECRET` 和 `device_id` 计算期望 claim_code。
+- 请求中的 `claim_code` 必须和期望值完全一致。
 
-### 3. SMTP 配置
+成功行为：
 
-通过环境变量配置邮件发送：
+- 设置 `devices.owner_user_id = current_user_id`。
+- 设置 `devices.claimed_at`。
+- 可写入或更新 `devices.nickname`。
+- 写入 `device_members(device_id, user_id, role='owner')`。
+- 返回绑定后的设备对象。
 
-- `SMTP_HOST`
-- `SMTP_PORT`
-- `SMTP_USERNAME`
-- `SMTP_PASSWORD`
-- `SMTP_FROM`
-- `SMTP_USE_TLS`
-- `PUBLIC_APP_URL`
+失败行为：
 
-如果 SMTP 未配置：
+- 设备不存在：返回 404。
+- claim_code 不匹配：返回 401 或 403，错误信息明确为 `invalid claim code`。
+- 设备已绑定：返回 409，错误信息明确为 `device already claimed`。
 
-- 本地开发不要崩溃。
-- 将验证/重置链接记录到日志中，方便测试。
-- 不要在 API response 中返回明文 token，除非测试环境显式启用，例如 `EPAPER_DEBUG_RETURN_EMAIL_TOKENS=1`。
-
-邮件链接格式建议：
-
-```text
-{PUBLIC_APP_URL}/verify-email?token=...
-{PUBLIC_APP_URL}/reset-password?token=...
-```
-
-### 4. 邮箱验证权限规则
-
-以下用户写操作要求邮箱已验证：
-
-- `POST /api/me/devices/claim`
-- `POST /api/images` 使用 Bearer token 上传时
-- `POST /api/me/devices/{device_id}/assign`
-- 家庭共享邀请相关写操作
-
-登录和 `GET /api/me` 不要求邮箱已验证。
-
-未验证时返回 HTTP 403，detail 使用稳定文本，例如：
-
-```text
-email not verified
-```
-
-### 5. 家庭共享设备
-
-保留 `devices.owner_user_id` 字段，兼容现有逻辑。
-
-新增 `device_members` 表：
-
-- `device_id TEXT NOT NULL`
-- `user_id TEXT NOT NULL`
-- `role TEXT NOT NULL`
-- `created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
-- 唯一索引：`(device_id, user_id)`
-
-角色固定为：
-
-- `owner`
-- `admin`
-- `viewer`
-
-claim 成功时：
-
-- 继续写入 `devices.owner_user_id`
-- 同时写入 `device_members(role='owner')`
-
-新增 `device_invites` 表：
-
-- `invite_id TEXT PRIMARY KEY`
-- `device_id TEXT NOT NULL`
-- `email TEXT NOT NULL`
-- `role TEXT NOT NULL`
-- `token_hash TEXT NOT NULL`
-- `expires_at TEXT NOT NULL`
-- `accepted_at TEXT`
-- `created_by_user_id TEXT NOT NULL`
-- `created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
-
-### 6. 家庭共享接口
-
-修改：
+## 7. 用户设备接口
 
 ```http
 GET /api/me/devices
-```
-
-返回当前用户拥有或被共享的设备，`AppDevice` 增加：
-
-```json
-{"role":"owner"}
-```
-
-修改：
-
-```http
 GET /api/me/devices/{device_id}
-```
-
-校验用户是否在 `device_members` 中，不再只看 `owner_user_id`。
-
-新增：
-
-```http
 PATCH /api/me/devices/{device_id}
-Authorization: Bearer <token>
+DELETE /api/me/devices/{device_id}
 ```
 
-Body：
+要求：
 
-```json
-{"nickname":"Desk display"}
+- `GET /api/me/devices` 返回用户拥有的设备、被单设备邀请共享的设备、家庭组/好友组共享的设备。
+- 返回设备时包含当前用户对设备的角色，例如 `owner`、`admin`、`viewer`。
+- 可包含 `share_source`：`owner`、`device_invite`、`group`。
+- `owner/admin` 可以修改 nickname。
+- `owner` 删除设备绑定时清空 owner 和成员关系。
+- `admin/viewer` 删除时只退出共享，不解绑设备。
+
+## 8. 家庭组 / 好友组
+
+账号组用于跨账号共享设备控制权。
+
+建议数据表：
+
+```text
+account_groups(group_id, name, kind, owner_user_id, created_at)
+account_group_members(group_id, user_id, role, created_at)
+account_group_invites(invite_id, group_id, email, role, code_hash, expires_at, accepted_at, created_by_user_id, created_at)
+group_device_shares(group_id, device_id, role, created_by_user_id, created_at)
 ```
 
-权限：
+`kind` 只允许：
 
-- `owner` 或 `admin` 可以修改 nickname。
-
-新增：
-
-```http
-POST /api/me/devices/{device_id}/invites
-Authorization: Bearer <token>
+```text
+family
+friends
 ```
 
-Body：
+组成员角色：
 
-```json
-{"email":"member@example.com","role":"admin"}
+```text
+owner
+admin
+member
 ```
 
-权限：
+设备共享角色：
 
-- `owner` 或 `admin` 可以邀请。
-- 可邀请角色只允许 `admin` 或 `viewer`，不能邀请 `owner`。
+```text
+admin
+viewer
+```
 
-行为：
-
-- 创建 invite token。
-- 发送邀请邮件。
-- 返回 `DeviceInvite`，不要返回明文 token，除非 debug 环境显式启用。
-
-验证码规则：
-
-- 邮箱验证、密码找回、设备邀请接受都使用 6 位数字或大写字母验证码，例如 `A7K2P9`。
-- 数据库只存验证码 hash，不存明文。
-- 验证码有效期建议 10 分钟，最多尝试 5 次，超过后作废。
-- 邮件中只展示 6 位验证码，不展示长 token 链接；App 由用户手动输入验证码。
-
-### 6.1 家庭组 / 好友组共享
-
-账号组层级用于“一个人绑定设备后，同组账号都可以异地控制共享设备”。App 当前按以下接口接入；若服务端字段命名不同，以服务端实际实现为准。
-
-`account_groups` 表：
-
-- `group_id TEXT PRIMARY KEY`
-- `name TEXT NOT NULL`
-- `kind TEXT NOT NULL`，只允许 `family` 或 `friends`
-- `owner_user_id TEXT NOT NULL`
-- `created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
-
-`account_group_members` 表：
-
-- `group_id TEXT NOT NULL`
-- `user_id TEXT NOT NULL`
-- `role TEXT NOT NULL`，只允许 `owner`、`admin`、`member`
-- `created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
-- 唯一索引：`(group_id, user_id)`
-
-`account_group_invites` 表：
-
-- `invite_id TEXT PRIMARY KEY`
-- `group_id TEXT NOT NULL`
-- `email TEXT NOT NULL`
-- `role TEXT NOT NULL`
-- `code_hash TEXT NOT NULL`
-- `expires_at TEXT NOT NULL`
-- `accepted_at TEXT`
-- `created_by_user_id TEXT NOT NULL`
-- `created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
-
-`group_device_shares` 表：
-
-- `group_id TEXT NOT NULL`
-- `device_id TEXT NOT NULL`
-- `role TEXT NOT NULL`，只允许 `admin` 或 `viewer`
-- `created_by_user_id TEXT NOT NULL`
-- `created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
-- 唯一索引：`(group_id, device_id)`
-
-App 已接入接口：
+接口：
 
 ```http
 GET /api/me/groups
@@ -339,214 +238,70 @@ POST /api/me/groups/{group_id}/devices
 DELETE /api/me/groups/{group_id}/devices/{device_id}
 ```
 
-权限规则：
-
-- 创建组要求用户邮箱已验证。
-- `owner/admin` 可以邀请成员、把自己有权限的设备共享到组。
-- 设备 owner 始终保留最高权限；组共享只授予组成员访问/控制权，不转移设备归属。
-- `GET /api/me/devices` 返回用户自有设备、被单设备邀请共享的设备、所在组共享的设备，并附带 `share_source`：`owner`、`device_invite` 或 `group`。
-- `POST /api/me/devices/{device_id}/assign` 允许设备 owner、设备 admin、组 admin 控制；viewer 只读。
-
-新增：
-
-```http
-POST /api/me/device-invites/accept
-Authorization: Bearer <token>
-```
-
-Body：
-
-```json
-{"token":"TOKEN"}
-```
-
-行为：
-
-- token 有效、未过期、未接受。
-- 当前登录用户 email 必须等于 invite email。
-- 写入 `device_members`。
-- 设置 `accepted_at`。
-- 返回 `AppDevice`。
-
-新增：
-
-```http
-GET /api/me/devices/{device_id}/members
-Authorization: Bearer <token>
-```
-
 权限：
 
-- 任意成员可查看。
+- 创建组要求用户登录，建议要求邮箱已验证。
+- 组 owner/admin 可以邀请成员。
+- 设备 owner 可以把设备共享到组。
+- 设备 owner 始终保留最高权限。
+- 组共享不转移设备所有权。
+- 组 admin 可以控制被共享设备。
+- viewer 只能查看设备状态，不能下发图片。
 
-Response：
+## 9. 图片上传与下发
 
-```json
-{"members":[{"user_id":"...","email":"...","role":"owner","created_at":"..."}]}
-```
-
-新增：
-
-```http
-DELETE /api/me/devices/{device_id}/members/{user_id}
-Authorization: Bearer <token>
-```
-
-权限：
-
-- 只有 `owner` 可以移除成员。
-- 不允许移除最后一个 owner。
-
-修改：
+App 端接口：
 
 ```http
-DELETE /api/me/devices/{device_id}
-```
-
-行为：
-
-- 如果当前用户是 `owner`：解绑设备，清空 `owner_user_id`、`claimed_at`、`nickname`，删除所有 members。
-- 如果当前用户是 `admin` 或 `viewer`：只退出共享，即删除自己的 `device_members` 记录，不解绑设备。
-
-### 7. Assign 权限
-
-修改：
-
-```http
+POST /api/images
 POST /api/me/devices/{device_id}/assign
 ```
 
-权限：
-
-- `owner` 和 `admin` 可以 assign。
-- `viewer` 返回 403。
-
-图片权限：
-
-- Bearer 上传的图片仍归属于上传用户。
-- 用户只能 assign 自己拥有的图片。
-
-### 8. 图片访问授权
-
-当前图片 metadata、preview、data 是公开的，正式版需要收紧。
-
 要求：
 
-- `GET /api/images/{image_id}`：Bearer token 访问，用户必须拥有该图片，或是某个使用该图片设备的 member。
-- `GET /api/images/{image_id}/preview`：同上。
-- `GET /api/images/{image_id}/data`：
-  - 为兼容 ESP32，暂时保留旧行为或增加兼容分支。
-  - 推荐支持 `X-Device-Token` + device/image 匹配校验，或由 manifest 返回短期签名 URL。
+- 上传图片要求 Bearer token。
+- 下发图片要求用户对设备有 `owner` 或 `admin` 权限。
+- `assign` 成功后递增设备 `current_version`。
+- 更新设备 `current_image_id`。
 
-实现时必须保证当前 ESP32 `download_url` 下载不被直接破坏。可以先让 App 图片访问受 Bearer 保护，ESP32 data 下载保留兼容路径，并在代码中标注后续安全升级点。
+## 10. ESP32 轮询接口
 
-### 9. 状态历史接口
-
-保留现有 `status_events` 表。
-
-新增：
+保持兼容：
 
 ```http
-GET /api/me/devices/{device_id}/status-events?limit=50
-Authorization: Bearer <token>
+GET /api/devices/{device_id}/current
+POST /api/devices/{device_id}/status
+GET /api/images/{image_id}/data
 ```
 
-权限：
+`GET /api/devices/{device_id}/current`：
 
-- 任意 device member 可查看。
+- 使用 `X-Device-Token` 校验设备身份。
+- 返回当前图片 manifest。
+- 如果没有图片，返回 `has_image=false`。
 
-Response：
+`POST /api/devices/{device_id}/status`：
 
-```json
-{
-  "events": [
-    {
-      "id": 1,
-      "device_id": "device001",
-      "version": 1,
-      "status": "displayed",
-      "error": null,
-      "battery_mv": 3800,
-      "rssi": -62,
-      "created_at": "..."
-    }
-  ]
-}
-```
+- 使用 `X-Device-Token` 校验设备身份。
+- 记录 `last_seen_at`、`last_status`、`last_error`、`battery_mv`、`rssi`。
 
-### 10. HTTPS / 部署文档
+`GET /api/images/{image_id}/data`：
 
-更新 README / AGENTS：
+- 继续兼容 ESP32 下载。
+- 推荐后续增加设备 token 或签名 URL 校验。
 
-- 说明生产环境必须使用域名和 HTTPS。
-- App 默认 base URL 应改为 HTTPS 域名。
-- nginx 增加 443 配置说明。
-- 保留 80 到 443 redirect。
-- 不要在文档中写真实 secret。
+## 11. 测试要求
 
-### 11. 备份和日志
+必须覆盖：
 
-新增备份脚本，例如：
+- HMAC claim_code 计算正确。
+- claim_code 错误时拒绝绑定。
+- 已绑定设备不能被第二个用户重复绑定。
+- BLE 二维码绑定成功。
+- SoftAP 二维码绑定成功。
+- `data={...}` 二维码格式可用。
+- owner 可以共享设备到家庭组/好友组。
+- 组 admin 可以控制设备。
+- viewer 不能下发图片。
+- ESP32 current/status/data 接口保持兼容。
 
-```text
-scripts/backup.sh
-```
-
-备份内容：
-
-- SQLite 数据库
-- images 目录
-
-新增结构化日志：
-
-- auth register/login/verify/reset
-- device claim/assign/unbind
-- invite create/accept
-- device status
-
-不要记录：
-
-- 明文密码
-- device token
-- claim code
-- 邮箱验证 token
-- 密码重置 token
-
-## 测试要求
-
-请新增或更新 pytest 测试，覆盖：
-
-- 注册后 `email_verified=false`。
-- 验证邮箱成功、重复验证、过期 token。
-- 未验证邮箱不能 claim/upload/assign。
-- password reset request 不暴露邮箱是否存在。
-- password reset confirm 成功、过期、重复使用失败。
-- claim 后创建 owner membership。
-- owner/admin/viewer 权限矩阵。
-- viewer 不能 assign。
-- admin 可以 assign。
-- 非成员不能查看设备、成员、状态历史。
-- invite 创建、接受、邮箱不匹配、过期、重复接受。
-- 删除设备成员，不能删除最后一个 owner。
-- owner 解绑设备后 members 清空。
-- admin/viewer 调用 DELETE 只退出共享，不解绑设备。
-- 图片 metadata/preview 授权。
-- ESP32 旧协议 `current/status/data` 兼容。
-
-运行：
-
-```bash
-pytest
-python -m py_compile app/main.py app/db.py app/image_processing.py simulate_device.py
-```
-
-## 交付结果
-
-完成后请输出：
-
-- 修改了哪些文件。
-- 新增了哪些 API。
-- 是否保持旧 ESP32 协议兼容。
-- 如何配置 SMTP。
-- 如何配置 HTTPS 域名。
-- 测试结果。

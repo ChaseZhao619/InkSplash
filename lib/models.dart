@@ -81,10 +81,17 @@ class ProvisioningQrPayload {
     return underscore > 0 ? name.substring(0, underscore + 1) : name;
   }
 
+  bool get isBle => transport == 'ble';
+  bool get isSoftAp => transport == 'softap';
+
   factory ProvisioningQrPayload.fromRaw(String raw) {
+    var normalized = raw.trim();
+    if (normalized.startsWith('data=')) {
+      normalized = normalized.substring(5).trim();
+    }
     final Object? decoded;
     try {
-      decoded = jsonDecode(raw);
+      decoded = jsonDecode(normalized);
     } catch (_) {
       throw const FormatException('二维码内容不是有效 JSON');
     }
@@ -113,14 +120,14 @@ class ProvisioningQrPayload {
     if (payload.version != 'v1') {
       throw FormatException('不支持的二维码版本：${payload.version}');
     }
-    if (payload.transport != 'ble') {
+    if (payload.transport != 'ble' && payload.transport != 'softap') {
       throw FormatException(
-        '当前 App 只支持 BLE 配网二维码，不支持 ${payload.transport.isEmpty ? '空 transport' : payload.transport}',
+        '当前 App 只支持 BLE 或 SoftAP 配网二维码，不支持 ${payload.transport.isEmpty ? '空 transport' : payload.transport}',
       );
     }
-    if (payload.security != 1) {
+    if (payload.security != 0 && payload.security != 1) {
       throw FormatException(
-        '当前 App 只支持 Security 1，不支持 Security ${payload.security}',
+        '当前 App 只支持 Security 0 或 1，不支持 Security ${payload.security}',
       );
     }
     return payload;

@@ -28,6 +28,24 @@ class ProvisioningService {
         .toList(growable: false);
   }
 
+  Future<List<ProvisioningDevice>> searchSoftApDevices({
+    required String prefix,
+    required String name,
+  }) async {
+    final raw = await _channel.invokeMethod<List<dynamic>>(
+      'searchSoftApDevices',
+      {'prefix': prefix, 'name': name},
+    );
+    return (raw ?? const [])
+        .whereType<Map>()
+        .map(
+          (item) => ProvisioningDevice.fromJson(
+            item.map((key, value) => MapEntry('$key', value)),
+          ),
+        )
+        .toList(growable: false);
+  }
+
   Future<void> connectBleDevice({
     required String name,
     required String proofOfPossession,
@@ -36,6 +54,20 @@ class ProvisioningService {
     await _channel.invokeMethod<void>('connectBleDevice', {
       'name': name,
       'proofOfPossession': proofOfPossession,
+      'security': security,
+    });
+  }
+
+  Future<void> connectSoftApDevice({
+    required String name,
+    required String proofOfPossession,
+    String password = '',
+    int security = 1,
+  }) async {
+    await _channel.invokeMethod<void>('connectSoftApDevice', {
+      'name': name,
+      'proofOfPossession': proofOfPossession,
+      'password': password,
       'security': security,
     });
   }

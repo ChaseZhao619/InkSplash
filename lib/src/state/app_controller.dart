@@ -411,12 +411,19 @@ class AppController extends ChangeNotifier {
 
   Future<void> searchProvisioningDevice(AppStrings s) async {
     final payload = requireQr(s);
-    await runAction(s, s.bleSearchAction, () async {
-      await _provisioning.requestPermissions();
-      provisioningDevices = await _provisioning.searchBleDevices(
-        payload.devicePrefix,
-      );
-    });
+    await runAction(
+      s,
+      payload.isSoftAp ? s.softApSearchAction : s.bleSearchAction,
+      () async {
+        await _provisioning.requestPermissions();
+        provisioningDevices = payload.isSoftAp
+            ? await _provisioning.searchSoftApDevices(
+                prefix: payload.devicePrefix,
+                name: payload.name,
+              )
+            : await _provisioning.searchBleDevices(payload.devicePrefix);
+      },
+    );
   }
 
   Future<void> connectProvisioningDevice(
@@ -424,16 +431,28 @@ class AppController extends ChangeNotifier {
     ProvisioningDevice device,
   ) async {
     final payload = requireQr(s);
-    await runAction(s, s.bleConnectAction, () async {
-      await _provisioning.connectBleDevice(
-        name: device.name,
-        proofOfPossession: payload.proofOfPossession,
-        security: payload.security,
-      );
-      final networks = await _provisioning.scanWifiNetworks();
-      wifiNetworks = networks;
-      selectedWifi = networks.isEmpty ? null : networks.first;
-    });
+    await runAction(
+      s,
+      payload.isSoftAp ? s.softApConnectAction : s.bleConnectAction,
+      () async {
+        if (payload.isSoftAp) {
+          await _provisioning.connectSoftApDevice(
+            name: device.name,
+            proofOfPossession: payload.proofOfPossession,
+            security: payload.security,
+          );
+        } else {
+          await _provisioning.connectBleDevice(
+            name: device.name,
+            proofOfPossession: payload.proofOfPossession,
+            security: payload.security,
+          );
+        }
+        final networks = await _provisioning.scanWifiNetworks();
+        wifiNetworks = networks;
+        selectedWifi = networks.isEmpty ? null : networks.first;
+      },
+    );
   }
 
   Future<void> provisionAndClaim(AppStrings s) async {
