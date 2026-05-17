@@ -185,7 +185,8 @@ DELETE /api/me/devices/{device_id}
 - 返回设备时包含当前用户对设备的角色，例如 `owner`、`admin`、`viewer`。
 - 可包含 `share_source`：`owner`、`device_invite`、`group`。
 - `owner/admin` 可以修改 nickname。
-- `owner` 删除设备绑定时清空 owner 和成员关系。
+- `owner` 删除设备绑定时必须让设备回到可重新绑定状态：清空 `devices.owner_user_id`、`devices.claimed_at`、`devices.nickname`，删除该设备所有 `device_members`、未使用的设备邀请、`group_device_shares` 关系；不要删除设备本身、`device_token`、轮询状态和历史状态。
+- `owner` 解绑完成后，同一个二维码里的 `device_id + claim_code` 应该可以被任意已验证账号重新绑定；如果仍返回 `device already claimed`，说明解绑逻辑不完整。
 - `admin/viewer` 删除时只退出共享，不解绑设备。
 
 ## 8. 家庭组 / 好友组
@@ -304,4 +305,3 @@ GET /api/images/{image_id}/data
 - 组 admin 可以控制设备。
 - viewer 不能下发图片。
 - ESP32 current/status/data 接口保持兼容。
-

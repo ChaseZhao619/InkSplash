@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart' hide ImageInfo;
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 
 import '../../models.dart';
@@ -57,8 +59,9 @@ class AppController extends ChangeNotifier {
   List<AppDevice> groupDevices = const [];
   ImageInfo? latestImage;
   Uint8List? previewPng;
-  String direction = 'auto';
+  String direction = 'portrait';
   String mode = 'scale';
+  int rotationDegrees = 0;
   String inviteRole = 'viewer';
   String groupKind = 'family';
   String groupInviteRole = 'member';
@@ -267,6 +270,9 @@ class AppController extends ChangeNotifier {
       renameController.text = selectedDevice?.nickname ?? '';
       members = const [];
       statusEvents = const [];
+      provisioningDevices = const [];
+      wifiNetworks = const [];
+      selectedWifi = null;
     });
   }
 
@@ -555,10 +561,11 @@ class AppController extends ChangeNotifier {
       if (device == null) {
         throw ApiError(s.selectBindDeviceFirst);
       }
+      final uploadFile = await _prepareUploadFile(picked);
       final image = await _imageService.uploadImage(
         bearerToken: token,
-        filePath: picked.path,
-        fileName: picked.name,
+        filePath: uploadFile.path,
+        fileName: uploadFile.fileName,
         options: UploadOptions(
           direction: direction,
           mode: mode,
@@ -634,6 +641,11 @@ class AppController extends ChangeNotifier {
 
   void setDirection(String value) {
     direction = value;
+    notifyListeners();
+  }
+
+  void setRotationDegrees(int value) {
+    rotationDegrees = value;
     notifyListeners();
   }
 
@@ -727,6 +739,30 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  Future<_UploadFile> _prepareUploadFile(XFile picked) async {
+    final normalizedRotation = rotationDegrees % 360;
+    if (normalizedRotation == 0) {
+      return _UploadFile(path: picked.path, fileName: picked.name);
+    }
+    final bytes = await File(picked.path).readAsBytes();
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) {
+      return _UploadFile(path: picked.path, fileName: picked.name);
+    }
+    final rotated = img.copyRotate(
+      img.bakeOrientation(decoded),
+      angle: normalizedRotation,
+    );
+    final tempFile = File(
+      '${Directory.systemTemp.path}/inksplash_${DateTime.now().microsecondsSinceEpoch}_$normalizedRotation.png',
+    );
+    await tempFile.writeAsBytes(img.encodePng(rotated), flush: true);
+    return _UploadFile(
+      path: tempFile.path,
+      fileName: 'inksplash_${normalizedRotation}_${picked.name}.png',
+    );
+  }
+
   @override
   void dispose() {
     baseUrlController.dispose();
@@ -747,4 +783,11 @@ class AppController extends ChangeNotifier {
     groupInviteCodeController.dispose();
     super.dispose();
   }
+}
+
+class _UploadFile {
+  const _UploadFile({required this.path, required this.fileName});
+
+  final String path;
+  final String fileName;
 }

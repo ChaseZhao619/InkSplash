@@ -149,7 +149,12 @@ class AppStrings {
   String get direction => isZh ? '方向' : 'Direction';
   String get auto => isZh ? '自动' : 'Auto';
   String get landscape => isZh ? '横向' : 'Landscape';
-  String get portrait => isZh ? '纵向' : 'Portrait';
+  String get portrait => isZh ? '竖向' : 'Portrait';
+  String get rotation => isZh ? '旋转' : 'Rotation';
+  String get rotate0 => '0°';
+  String get rotate90 => '90°';
+  String get rotate180 => '180°';
+  String get rotate270 => '270°';
   String get fitMode => isZh ? '适配方式' : 'Fit mode';
   String get scale => isZh ? '缩放' : 'Scale';
   String get cut => isZh ? '裁切' : 'Cut';

@@ -529,7 +529,10 @@ class _SharingEntryPanel extends StatelessWidget {
         trailing: const Icon(Icons.chevron_right),
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => _SharingPage(controller: controller),
+            builder: (_) => _BusyRoute(
+              controller: controller,
+              child: _SharingPage(controller: controller),
+            ),
           ),
         ),
       ),
@@ -903,7 +906,10 @@ class _SettingsPage extends StatelessWidget {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => _PasswordResetPage(controller: controller),
+                    builder: (_) => _BusyRoute(
+                      controller: controller,
+                      child: _PasswordResetPage(controller: controller),
+                    ),
                   ),
                 ),
               ),
@@ -1101,6 +1107,43 @@ class _PageScaffold extends StatelessWidget {
   }
 }
 
+class _BusyRoute extends StatelessWidget {
+  const _BusyRoute({required this.controller, required this.child});
+
+  final AppController controller;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        return Stack(
+          children: [
+            AbsorbPointer(absorbing: controller.busy, child: child),
+            if (controller.busy)
+              const Positioned(
+                left: 0,
+                top: 0,
+                right: 0,
+                child: LinearProgressIndicator(),
+              ),
+            if (controller.message != null)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: SafeArea(
+                  child: _MessageBanner(message: controller.message!),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _Panel extends StatelessWidget {
   const _Panel({required this.title, required this.child, this.action});
 
@@ -1174,7 +1217,7 @@ class _HeroPanel extends StatelessWidget {
           Text(subtitle, overflow: TextOverflow.ellipsis),
           const SizedBox(height: 16),
           AspectRatio(
-            aspectRatio: 4 / 3,
+            aspectRatio: 480 / 800,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: const Color(0xffefede6),
@@ -1235,6 +1278,20 @@ class _ImageOptions extends StatelessWidget {
           ],
           selected: {controller.direction},
           onSelectionChanged: (values) => controller.setDirection(values.first),
+        ),
+        const SizedBox(height: 10),
+        Text(s.rotation),
+        const SizedBox(height: 6),
+        SegmentedButton<int>(
+          segments: [
+            ButtonSegment(value: 0, label: Text(s.rotate0)),
+            ButtonSegment(value: 90, label: Text(s.rotate90)),
+            ButtonSegment(value: 180, label: Text(s.rotate180)),
+            ButtonSegment(value: 270, label: Text(s.rotate270)),
+          ],
+          selected: {controller.rotationDegrees},
+          onSelectionChanged: (values) =>
+              controller.setRotationDegrees(values.first),
         ),
         const SizedBox(height: 10),
         Text(s.fitMode),
