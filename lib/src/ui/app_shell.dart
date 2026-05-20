@@ -75,9 +75,10 @@ class _AppShellState extends State<AppShell> {
         }
         final pages = [
           _HomePage(controller: _controller),
-          _DevicesPage(controller: _controller),
-          _AddDevicePage(controller: _controller),
-          _SettingsPage(
+          _AlbumsPage(controller: _controller),
+          _TimelinePage(controller: _controller),
+          _SendPage(controller: _controller),
+          _MePage(
             controller: _controller,
             language: widget.language,
             onLanguageChanged: widget.onLanguageChanged,
@@ -118,24 +119,29 @@ class _AppShellState extends State<AppShell> {
             onDestinationSelected: (value) => setState(() => _index = value),
             destinations: [
               NavigationDestination(
-                icon: const Icon(Icons.dashboard_outlined),
-                selectedIcon: const Icon(Icons.dashboard),
+                icon: const Icon(Icons.home_outlined),
+                selectedIcon: const Icon(Icons.home),
                 label: s.home,
               ),
               NavigationDestination(
-                icon: const Icon(Icons.devices_outlined),
-                selectedIcon: const Icon(Icons.devices),
-                label: s.devices,
+                icon: const Icon(Icons.photo_library_outlined),
+                selectedIcon: const Icon(Icons.photo_library),
+                label: s.albums,
               ),
               NavigationDestination(
-                icon: const Icon(Icons.add_link_outlined),
-                selectedIcon: const Icon(Icons.add_link),
-                label: s.addDevice,
+                icon: const Icon(Icons.schedule_outlined),
+                selectedIcon: const Icon(Icons.schedule),
+                label: s.timeline,
               ),
               NavigationDestination(
-                icon: const Icon(Icons.tune_outlined),
-                selectedIcon: const Icon(Icons.tune),
-                label: s.settings,
+                icon: const Icon(Icons.send_outlined),
+                selectedIcon: const Icon(Icons.send),
+                label: s.send,
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.person_outline),
+                selectedIcon: const Icon(Icons.person),
+                label: s.me,
               ),
             ],
           ),
@@ -175,123 +181,158 @@ class _AuthPageState extends State<_AuthPage> {
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 460),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 42, 24, 24),
-          shrinkWrap: true,
-          children: [
-            Text(
-              s.appName,
-              style: Theme.of(
-                context,
-              ).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isRegister
-                  ? s.createAccount
-                  : isReset
-                  ? s.forgotPassword
-                  : s.welcomeBack,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-            Text(s.signInSubtitle),
-            const SizedBox(height: 26),
-            if (!isReset) ...[
-              TextField(
-                controller: controller.emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(labelText: s.email),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller.passwordController,
-                obscureText: true,
-                decoration: InputDecoration(labelText: s.password),
-              ),
-              const SizedBox(height: 18),
-              FilledButton(
-                onPressed: () => controller.login(s, register: isRegister),
-                child: Text(isRegister ? s.createAccount : s.login),
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () => setState(
-                  () =>
-                      _mode = isRegister ? _AuthMode.login : _AuthMode.register,
-                ),
-                child: Text(isRegister ? s.haveAccount : s.noAccount),
-              ),
-              TextButton(
-                onPressed: () => setState(() => _mode = _AuthMode.reset),
-                child: Text(s.forgotPassword),
-              ),
-            ] else ...[
-              TextField(
-                controller: controller.resetEmailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  labelText: s.resetEmail,
-                  helperText: s.resetEmailHelp,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                s.appName,
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => controller.requestPasswordReset(s),
-                icon: const Icon(Icons.mark_email_read_outlined),
-                label: Text(s.sendCode),
+              const SizedBox(height: 8),
+              Text(
+                isRegister
+                    ? s.createAccount
+                    : isReset
+                    ? s.forgotPassword
+                    : s.welcomeBack,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
+              const SizedBox(height: 6),
+              Text(s.signInSubtitle),
               const SizedBox(height: 12),
-              TextField(
-                controller: controller.resetTokenController,
-                textCapitalization: TextCapitalization.characters,
-                inputFormatters: _codeFormatters,
-                decoration: InputDecoration(
-                  labelText: s.resetToken,
-                  helperText: s.codeHelp,
+              if (!isReset && !isRegister) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset(
+                    'assets/demo/album_cover.png',
+                    height: 82,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller.resetPasswordController,
-                obscureText: true,
-                decoration: InputDecoration(labelText: s.newPassword),
-              ),
-              const SizedBox(height: 18),
-              FilledButton(
-                onPressed: () => controller.confirmPasswordReset(s),
-                child: Text(s.resetPassword),
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () => setState(() => _mode = _AuthMode.login),
-                child: Text(s.backToLogin),
-              ),
-            ],
-            const SizedBox(height: 18),
-            SegmentedButton<LanguagePreference>(
-              segments: [
-                ButtonSegment(
-                  value: LanguagePreference.system,
-                  label: Text(s.followSystem),
-                  icon: const Icon(Icons.phone_iphone),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {},
+                        icon: const Icon(Icons.apple),
+                        label: const Text('Apple'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {},
+                        icon: const Icon(Icons.g_mobiledata),
+                        label: const Text('Google'),
+                      ),
+                    ),
+                  ],
                 ),
-                ButtonSegment(
-                  value: LanguagePreference.zh,
-                  label: Text(s.simplifiedChinese),
+                const SizedBox(height: 10),
+              ],
+              if (!isReset) ...[
+                TextField(
+                  controller: controller.emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(labelText: s.email),
                 ),
-                ButtonSegment(
-                  value: LanguagePreference.en,
-                  label: Text(s.english),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller.passwordController,
+                  obscureText: true,
+                  decoration: InputDecoration(labelText: s.password),
+                ),
+                const SizedBox(height: 18),
+                FilledButton(
+                  onPressed: () => controller.login(s, register: isRegister),
+                  child: Text(isRegister ? s.createAccount : s.login),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => setState(
+                    () => _mode = isRegister
+                        ? _AuthMode.login
+                        : _AuthMode.register,
+                  ),
+                  child: Text(isRegister ? s.haveAccount : s.noAccount),
+                ),
+                TextButton(
+                  onPressed: () => setState(() => _mode = _AuthMode.reset),
+                  child: Text(s.forgotPassword),
+                ),
+              ] else ...[
+                TextField(
+                  controller: controller.resetEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: s.resetEmail,
+                    helperText: s.resetEmailHelp,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () => controller.requestPasswordReset(s),
+                  icon: const Icon(Icons.mark_email_read_outlined),
+                  label: Text(s.sendCode),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller.resetTokenController,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: _codeFormatters,
+                  decoration: InputDecoration(
+                    labelText: s.resetToken,
+                    helperText: s.codeHelp,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller.resetPasswordController,
+                  obscureText: true,
+                  decoration: InputDecoration(labelText: s.newPassword),
+                ),
+                const SizedBox(height: 18),
+                FilledButton(
+                  onPressed: () => controller.confirmPasswordReset(s),
+                  child: Text(s.resetPassword),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => setState(() => _mode = _AuthMode.login),
+                  child: Text(s.backToLogin),
                 ),
               ],
-              selected: {widget.language},
-              onSelectionChanged: (value) =>
-                  widget.onLanguageChanged(value.first),
-            ),
-          ],
+              const SizedBox(height: 18),
+              SegmentedButton<LanguagePreference>(
+                segments: [
+                  ButtonSegment(
+                    value: LanguagePreference.system,
+                    label: Text(s.followSystem),
+                    icon: const Icon(Icons.phone_iphone),
+                  ),
+                  ButtonSegment(
+                    value: LanguagePreference.zh,
+                    label: Text(s.simplifiedChinese),
+                  ),
+                  ButtonSegment(
+                    value: LanguagePreference.en,
+                    label: Text(s.english),
+                  ),
+                ],
+                selected: {widget.language},
+                onSelectionChanged: (value) =>
+                    widget.onLanguageChanged(value.first),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -306,16 +347,173 @@ class _HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = AppStrings.of(context);
+    final greeting = s.isZh ? '早上好，Emily' : 'Good morning, Emily';
+    return _PageScaffold(
+      children: [
+        _HeaderBlock(
+          icon: Icons.wb_sunny_outlined,
+          title: greeting,
+          subtitle: s.isZh
+              ? '珍藏每一刻，记录爱与生活。'
+              : 'Cherish each moment, record love and life.',
+        ),
+        _Panel(
+          title: s.isZh ? '我的相册' : 'My Albums',
+          action: TextButton(
+            onPressed: () {},
+            child: Text(s.isZh ? '查看全部' : 'View all'),
+          ),
+          child: SizedBox(
+            height: 152,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemBuilder: (context, index) =>
+                  _AlbumCoverCard(album: _demoAlbums[index], compact: true),
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemCount: _demoAlbums.length,
+            ),
+          ),
+        ),
+        _Panel(
+          title: s.familySharing,
+          action: TextButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => _BusyRoute(
+                  controller: controller,
+                  child: _SharingPage(controller: controller),
+                ),
+              ),
+            ),
+            child: Text(s.manageSharing),
+          ),
+          child: _MemberAvatarRow(),
+        ),
+        _DeviceSyncCard(controller: controller),
+        _Panel(
+          title: s.isZh ? '最近更新' : 'Recent Updates',
+          child: Column(
+            children: [
+              for (final item in _demoUpdates)
+                _UpdateTile(
+                  title: item.titleZh,
+                  subtitle: item.subtitleZh,
+                  image: item.asset,
+                  dotColor: item.color,
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AlbumsPage extends StatelessWidget {
+  const _AlbumsPage({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    return _PageScaffold(
+      children: [
+        _HeaderBlock(
+          icon: Icons.photo_library_outlined,
+          title: s.isZh ? '我的相册' : 'My Albums',
+          subtitle: s.isZh
+              ? '浏览、筛选和珍藏每一段回忆。'
+              : 'Browse, filter, and keep every memory.',
+        ),
+        _FilterChips(
+          labels: [
+            s.isZh ? '全部' : 'All',
+            s.isZh ? '旅行' : 'Travel',
+            s.isZh ? '家人' : 'Family',
+            s.isZh ? '成长' : 'Growth',
+            s.isZh ? '节日' : 'Holiday',
+          ],
+        ),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 0.82,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+          ),
+          itemCount: _demoAlbums.length,
+          itemBuilder: (context, index) => _AlbumCoverCard(
+            album: _demoAlbums[index],
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => _AlbumDetailPage(album: _demoAlbums[index]),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TimelinePage extends StatelessWidget {
+  const _TimelinePage({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    return _PageScaffold(
+      children: [
+        _HeaderBlock(
+          icon: Icons.schedule_outlined,
+          title: s.timeline,
+          subtitle: s.isZh
+              ? '按月份整理生活流动的瞬间。'
+              : 'Moments arranged by month and feeling.',
+        ),
+        _FilterChips(labels: const ['2024', '3月', '4月', '5月', '6月']),
+        for (final group in _demoTimeline)
+          _Panel(
+            title: group.title,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  group.subtitle,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 10),
+                _PhotoStrip(assets: group.assets),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _SendPage extends StatelessWidget {
+  const _SendPage({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final device = controller.selectedDevice;
     final selectedDeviceId =
         controller.devices.any((item) => item.deviceId == device?.deviceId)
         ? device!.deviceId
         : null;
-
     return _PageScaffold(
       children: [
         _HeroPanel(
-          title: s.currentCanvas,
+          title: s.isZh ? '编辑照片' : 'Edit Photo',
           subtitle: device == null
               ? s.selectBindDeviceFirst
               : _deviceTitle(device),
@@ -323,7 +521,7 @@ class _HomePage extends StatelessWidget {
           emptyText: s.noPreview,
         ),
         _Panel(
-          title: s.targetDevice,
+          title: s.isZh ? '01 选择设备' : '01 Select Device',
           action: IconButton(
             onPressed: () => controller.refreshDevices(s),
             icon: const Icon(Icons.refresh),
@@ -332,45 +530,59 @@ class _HomePage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              InputDecorator(
+              DropdownButtonFormField<String>(
+                initialValue: selectedDeviceId,
+                items: [
+                  for (final item in controller.devices)
+                    DropdownMenuItem(
+                      value: item.deviceId,
+                      child: Text(
+                        _deviceTitle(item),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: controller.devices.isEmpty
+                    ? null
+                    : (value) {
+                        if (value != null) controller.selectTargetDevice(value);
+                      },
                 decoration: InputDecoration(
                   labelText: s.targetDevice,
                   helperText: controller.devices.isEmpty
                       ? s.bindFirstThenRefresh
                       : null,
                 ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    isExpanded: true,
-                    value: selectedDeviceId,
-                    hint: Text(
-                      controller.devices.isEmpty
-                          ? s.noDeviceAvailable
-                          : s.selectTargetDevice,
-                    ),
-                    items: [
-                      for (final item in controller.devices)
-                        DropdownMenuItem(
-                          value: item.deviceId,
-                          child: Text(
-                            _deviceTitle(item),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                    onChanged: controller.devices.isEmpty
-                        ? null
-                        : (value) {
-                            if (value != null) {
-                              controller.selectTargetDevice(value);
-                            }
-                          },
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => _AddDevicePage(controller: controller),
                   ),
                 ),
+                icon: const Icon(Icons.add_link_outlined),
+                label: Text(s.addDevice),
               ),
-              const SizedBox(height: 14),
+            ],
+          ),
+        ),
+        _Panel(
+          title: s.isZh ? '02 编辑与适配' : '02 Edit & Fit',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               _ImageOptions(controller: controller),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
+              _FilterChips(
+                labels: [
+                  s.isZh ? '柔和' : 'Soft',
+                  s.isZh ? '自然' : 'Natural',
+                  s.isZh ? '清晰' : 'Clear',
+                  s.isZh ? '怀旧' : 'Nostalgic',
+                ],
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
@@ -397,31 +609,61 @@ class _HomePage extends StatelessWidget {
         ),
         if (controller.latestImage != null)
           _ImageMetaPanel(image: controller.latestImage!),
-        _SharingEntryPanel(controller: controller),
-        _Panel(
-          title: s.deviceOverview,
-          child: device == null
-              ? _EmptyState(icon: Icons.devices_other, text: s.noBoundDevices)
-              : Column(
-                  children: [
-                    _KeyValue(label: s.deviceId, value: device.deviceId),
-                    if (device.role != null)
-                      _KeyValue(label: s.role, value: device.role!),
-                    _KeyValue(
-                      label: s.version,
-                      value: '${device.currentVersion ?? 0}',
-                    ),
-                    if (device.lastStatus != null)
-                      _KeyValue(label: s.status, value: device.lastStatus!),
-                    if (device.batteryMv != null)
-                      _KeyValue(
-                        label: 'Battery',
-                        value: '${device.batteryMv} mV',
-                      ),
-                    if (device.rssi != null)
-                      _KeyValue(label: 'RSSI', value: '${device.rssi} dBm'),
-                  ],
-                ),
+        _SendProgressPanel(controller: controller),
+      ],
+    );
+  }
+}
+
+class _MePage extends StatelessWidget {
+  const _MePage({
+    required this.controller,
+    required this.language,
+    required this.onLanguageChanged,
+  });
+
+  final AppController controller;
+  final LanguagePreference language;
+  final ValueChanged<LanguagePreference> onLanguageChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    final email = controller.session?.user.email ?? 'emily@inksplash.com';
+    return _PageScaffold(
+      children: [
+        _ProfileHeader(email: email),
+        _SettingsList(
+          controller: controller,
+          language: language,
+          onLanguageChanged: onLanguageChanged,
+        ),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => _DevicesPage(controller: controller),
+            ),
+          ),
+          icon: const Icon(Icons.devices_outlined),
+          label: Text(s.devices),
+        ),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => _SettingsPage(
+                controller: controller,
+                language: language,
+                onLanguageChanged: onLanguageChanged,
+              ),
+            ),
+          ),
+          icon: const Icon(Icons.tune_outlined),
+          label: Text(s.advanced),
+        ),
+        TextButton.icon(
+          onPressed: () => controller.logout(s),
+          icon: const Icon(Icons.logout),
+          label: Text(s.logout),
         ),
       ],
     );
@@ -1330,6 +1572,559 @@ class _ImageOptions extends StatelessWidget {
     );
   }
 }
+
+class _HeaderBlock extends StatelessWidget {
+  const _HeaderBlock({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
+      child: Row(
+        children: [
+          Icon(icon, color: colors.primary, size: 30),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+          Icon(Icons.notifications_none, color: colors.onSurface),
+        ],
+      ),
+    );
+  }
+}
+
+class _AlbumCoverCard extends StatelessWidget {
+  const _AlbumCoverCard({
+    required this.album,
+    this.compact = false,
+    this.onTap,
+  });
+
+  final _DemoAlbum album;
+  final bool compact;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: compact ? 118 : null,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  album.asset,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                ),
+              ),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              album.titleZh,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            Text(
+              '${album.count} 张照片',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MemberAvatarRow extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final members = [
+      ['Emily', '你', 'assets/demo/avatar_emily.png'],
+      ['爸爸', '在线', 'assets/demo/avatar_dad.png'],
+      ['妈妈', '在线', 'assets/demo/avatar_mom.png'],
+      ['奶奶', '离线', 'assets/demo/avatar_grandma.png'],
+    ];
+    return Row(
+      children: [
+        for (final member in members)
+          Expanded(
+            child: Column(
+              children: [
+                CircleAvatar(
+                  backgroundImage: AssetImage(member[2]),
+                  radius: 24,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  member[0],
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(member[1], style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+        OutlinedButton(onPressed: () {}, child: const Icon(Icons.add)),
+      ],
+    );
+  }
+}
+
+class _DeviceSyncCard extends StatelessWidget {
+  const _DeviceSyncCard({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    final device = controller.selectedDevice;
+    return _Panel(
+      title: s.isZh ? '设备同步' : 'Device Sync',
+      action: IconButton(
+        onPressed: () => controller.refreshDevices(s),
+        icon: const Icon(Icons.refresh),
+      ),
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: Image.asset(
+            'assets/demo/frame_preview.png',
+            width: 42,
+            height: 58,
+            fit: BoxFit.cover,
+          ),
+        ),
+        title: Text(device == null ? 'InkPad Color 6' : _deviceTitle(device)),
+        subtitle: Text(
+          device == null
+              ? '已连接 · 电量 78%'
+              : '${device.lastStatus ?? 'online'} · v${device.currentVersion ?? 0}',
+        ),
+        trailing: const Icon(Icons.chevron_right),
+      ),
+    );
+  }
+}
+
+class _UpdateTile extends StatelessWidget {
+  const _UpdateTile({
+    required this.title,
+    required this.subtitle,
+    required this.image,
+    required this.dotColor,
+  });
+
+  final String title;
+  final String subtitle;
+  final String image;
+  final Color dotColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: Image.asset(image, width: 52, height: 52, fit: BoxFit.cover),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: Text(subtitle),
+      trailing: CircleAvatar(radius: 4, backgroundColor: dotColor),
+    );
+  }
+}
+
+class _FilterChips extends StatelessWidget {
+  const _FilterChips({required this.labels});
+
+  final List<String> labels;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: labels.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) => Chip(
+          label: Text(labels[index]),
+          side: BorderSide(color: colors.onSurface.withValues(alpha: 0.08)),
+          backgroundColor: index == 0 ? colors.primary : colors.surface,
+          labelStyle: TextStyle(
+            color: index == 0 ? Colors.white : colors.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PhotoStrip extends StatelessWidget {
+  const _PhotoStrip({required this.assets});
+
+  final List<String> assets;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 118,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: assets.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) => ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.asset(
+            assets[index],
+            width: 112,
+            height: 112,
+            fit: BoxFit.cover,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AlbumDetailPage extends StatelessWidget {
+  const _AlbumDetailPage({required this.album});
+
+  final _DemoAlbum album;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    return Scaffold(
+      appBar: AppBar(title: Text(album.titleZh)),
+      body: _PageScaffold(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              album.asset,
+              height: 220,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          ),
+          Text(
+            album.titleZh,
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          Text('${album.count} 张照片 · 6 个地点'),
+          _MemberAvatarRow(),
+          _FilterChips(
+            labels: [
+              s.isZh ? '照片' : 'Photos',
+              s.timeline,
+              s.isZh ? '地点' : 'Places',
+            ],
+          ),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 7,
+              crossAxisSpacing: 7,
+            ),
+            itemCount: _demoPhotos.length,
+            itemBuilder: (context, index) => ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.asset(_demoPhotos[index], fit: BoxFit.cover),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SendProgressPanel extends StatelessWidget {
+  const _SendProgressPanel({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    final active = controller.latestImage != null;
+    return _Panel(
+      title: s.isZh ? '03 发送与同步' : '03 Send & Sync',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LinearProgressIndicator(value: active ? 1 : 0.68),
+          const SizedBox(height: 12),
+          _ProgressStep(done: true, title: s.isZh ? '连接设备' : 'Connect Device'),
+          _ProgressStep(done: true, title: s.isZh ? '准备照片' : 'Prepare Photo'),
+          _ProgressStep(done: active, title: s.isZh ? '传输数据' : 'Transfer Data'),
+          _ProgressStep(done: active, title: s.isZh ? '更新相框' : 'Update Frame'),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgressStep extends StatelessWidget {
+  const _ProgressStep({required this.done, required this.title});
+
+  final bool done;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        done ? Icons.check_circle : Icons.radio_button_unchecked,
+        color: done ? Colors.green : Theme.of(context).colorScheme.primary,
+      ),
+      title: Text(title),
+    );
+  }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({required this.email});
+
+  final String email;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      title: 'Emily',
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: const CircleAvatar(
+          backgroundImage: AssetImage('assets/demo/avatar_emily.png'),
+          radius: 28,
+        ),
+        title: const Text(
+          'Emily',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+        subtitle: Text(email),
+        trailing: const Icon(Icons.chevron_right),
+      ),
+    );
+  }
+}
+
+class _SettingsList extends StatelessWidget {
+  const _SettingsList({
+    required this.controller,
+    required this.language,
+    required this.onLanguageChanged,
+  });
+
+  final AppController controller;
+  final LanguagePreference language;
+  final ValueChanged<LanguagePreference> onLanguageChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    final rows = [
+      [
+        Icons.security_outlined,
+        s.isZh ? '账号与安全' : 'Account & security',
+        s.isZh ? '修改密码 / 登录状态' : 'Password and sessions',
+      ],
+      [
+        Icons.notifications_none,
+        s.isZh ? '通知设置' : 'Notifications',
+        s.isZh ? '消息提醒 / 同步通知' : 'Alerts and sync',
+      ],
+      [
+        Icons.cloud_queue_outlined,
+        s.isZh ? '存储与空间' : 'Storage',
+        '2.3 GB / 10 GB',
+      ],
+      [
+        Icons.devices_outlined,
+        s.isZh ? '设备管理' : 'Device management',
+        s.isZh
+            ? '已连接 ${controller.devices.length} 台设备'
+            : '${controller.devices.length} devices connected',
+      ],
+      [
+        Icons.lock_outline,
+        s.isZh ? '隐私设置' : 'Privacy',
+        s.isZh ? '权限管理 / 可见性' : 'Permissions and visibility',
+      ],
+      [
+        Icons.help_outline,
+        s.isZh ? '帮助与反馈' : 'Help & feedback',
+        s.isZh ? '常见问题与反馈' : 'FAQ and feedback',
+      ],
+      [
+        Icons.info_outline,
+        s.isZh ? '关于 InkSplash' : 'About InkSplash',
+        'v1.0.10',
+      ],
+    ];
+    return _Panel(
+      title: s.settings,
+      child: Column(
+        children: [
+          SegmentedButton<LanguagePreference>(
+            segments: [
+              ButtonSegment(
+                value: LanguagePreference.system,
+                label: Text(s.followSystem),
+              ),
+              ButtonSegment(
+                value: LanguagePreference.zh,
+                label: Text(s.simplifiedChinese),
+              ),
+              ButtonSegment(
+                value: LanguagePreference.en,
+                label: Text(s.english),
+              ),
+            ],
+            selected: {language},
+            onSelectionChanged: (value) => onLanguageChanged(value.first),
+          ),
+          const SizedBox(height: 10),
+          for (final row in rows)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(row[0] as IconData),
+              title: Text(row[1] as String),
+              subtitle: Text(row[2] as String),
+              trailing: const Icon(Icons.chevron_right),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DemoAlbum {
+  const _DemoAlbum(this.titleZh, this.asset, this.count);
+
+  final String titleZh;
+  final String asset;
+  final int count;
+}
+
+class _DemoUpdate {
+  const _DemoUpdate(this.titleZh, this.subtitleZh, this.asset, this.color);
+
+  final String titleZh;
+  final String subtitleZh;
+  final String asset;
+  final Color color;
+}
+
+class _TimelineGroup {
+  const _TimelineGroup(this.title, this.subtitle, this.assets);
+
+  final String title;
+  final String subtitle;
+  final List<String> assets;
+}
+
+const _demoAlbums = [
+  _DemoAlbum('旅行足迹', 'assets/demo/mountain_lake.png', 142),
+  _DemoAlbum('家人时光', 'assets/demo/family_reading.png', 328),
+  _DemoAlbum('成长记忆', 'assets/demo/child_reading.png', 215),
+  _DemoAlbum('节日纪念', 'assets/demo/red_blossom.png', 96),
+  _DemoAlbum('日常点滴', 'assets/demo/daily_scene.png', 176),
+  _DemoAlbum('宠物时光', 'assets/demo/travel_town.png', 64),
+];
+
+const _demoPhotos = [
+  'assets/demo/mountain_lake.png',
+  'assets/demo/red_blossom.png',
+  'assets/demo/child_reading.png',
+  'assets/demo/family_reading.png',
+  'assets/demo/travel_town.png',
+  'assets/demo/daily_scene.png',
+  'assets/demo/frame_preview.png',
+  'assets/demo/album_cover.png',
+  'assets/demo/mountain_lake.png',
+];
+
+const _demoUpdates = [
+  _DemoUpdate(
+    '黄山之旅',
+    '新添加 12 张照片',
+    'assets/demo/mountain_lake.png',
+    Color(0xff2d5bff),
+  ),
+  _DemoUpdate(
+    '全家福 · 春节聚会',
+    '新添加 23 张照片',
+    'assets/demo/family_reading.png',
+    Color(0xffd46a6a),
+  ),
+  _DemoUpdate(
+    '小豆豆的画作',
+    '新添加 8 张照片',
+    'assets/demo/child_reading.png',
+    Color(0xffe5c35a),
+  ),
+];
+
+const _demoTimeline = [
+  _TimelineGroup('5月 · 黄山之旅', '142 张照片', [
+    'assets/demo/mountain_lake.png',
+    'assets/demo/red_blossom.png',
+    'assets/demo/travel_town.png',
+  ]),
+  _TimelineGroup('4月 · 家人时光', '328 张照片', [
+    'assets/demo/family_reading.png',
+    'assets/demo/child_reading.png',
+    'assets/demo/daily_scene.png',
+  ]),
+  _TimelineGroup('3月 · 春日日记', '215 张照片', [
+    'assets/demo/red_blossom.png',
+    'assets/demo/mountain_lake.png',
+    'assets/demo/album_cover.png',
+  ]),
+];
 
 class _ImageMetaPanel extends StatelessWidget {
   const _ImageMetaPanel({required this.image});

@@ -15,6 +15,10 @@ class AppStrings {
 
   String get appName => 'InkSplash';
   String get home => isZh ? '首页' : 'Home';
+  String get albums => isZh ? '相册' : 'Albums';
+  String get timeline => isZh ? '时间线' : 'Timeline';
+  String get send => isZh ? '发送' : 'Send';
+  String get me => isZh ? '我的' : 'Me';
   String get devices => isZh ? '设备' : 'Devices';
   String get addDevice => isZh ? '添加' : 'Add';
   String get settings => isZh ? '设置' : 'Settings';
