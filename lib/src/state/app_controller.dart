@@ -59,6 +59,7 @@ class AppController extends ChangeNotifier {
   List<AppDevice> groupDevices = const [];
   ImageInfo? latestImage;
   Uint8List? previewPng;
+  XFile? selectedImage;
   String direction = 'portrait';
   String mode = 'scale';
   int rotationDegrees = 0;
@@ -550,18 +551,30 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  Future<void> uploadAndAssign(AppStrings s) async {
-    await runAction(s, s.uploadAssignAction, () async {
+  Future<void> chooseImage(AppStrings s) async {
+    await runAction(s, s.chooseImageAction, () async {
       final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (picked == null) {
         return;
       }
+      selectedImage = picked;
+      latestImage = null;
+      await _refreshSelectedImagePreview();
+    });
+  }
+
+  Future<void> uploadAndAssign(AppStrings s) async {
+    await runAction(s, s.uploadAssignAction, () async {
       final token = requireLogin(s);
       final device = selectedDevice;
       if (device == null) {
         throw ApiError(s.selectBindDeviceFirst);
       }
-      final uploadFile = await _prepareUploadFile(picked);
+      final picked = selectedImage;
+      if (picked == null) {
+        throw ApiError(s.selectImageFirst);
+      }
+      final uploadFile = await _prepareUploadFile(picked, fullSize: true);
       final image = await _imageService.uploadImage(
         bearerToken: token,
         filePath: uploadFile.path,
@@ -644,8 +657,9 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setRotationDegrees(int value) {
+  Future<void> setRotationDegrees(int value) async {
     rotationDegrees = value;
+    await _refreshSelectedImagePreview();
     notifyListeners();
   }
 
@@ -739,9 +753,21 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  Future<_UploadFile> _prepareUploadFile(XFile picked) async {
+  Future<void> _refreshSelectedImagePreview() async {
+    final picked = selectedImage;
+    if (picked == null) {
+      return;
+    }
+    final uploadFile = await _prepareUploadFile(picked, fullSize: false);
+    previewPng = await File(uploadFile.path).readAsBytes();
+  }
+
+  Future<_UploadFile> _prepareUploadFile(
+    XFile picked, {
+    required bool fullSize,
+  }) async {
     final normalizedRotation = rotationDegrees % 360;
-    if (normalizedRotation == 0) {
+    if (normalizedRotation == 0 && fullSize) {
       return _UploadFile(path: picked.path, fileName: picked.name);
     }
     final bytes = await File(picked.path).readAsBytes();
@@ -749,14 +775,21 @@ class AppController extends ChangeNotifier {
     if (decoded == null) {
       return _UploadFile(path: picked.path, fileName: picked.name);
     }
-    final rotated = img.copyRotate(
+    var prepared = img.copyRotate(
       img.bakeOrientation(decoded),
       angle: normalizedRotation,
     );
+    if (!fullSize) {
+      prepared = img.copyResize(
+        prepared,
+        width: prepared.width >= prepared.height ? 800 : null,
+        height: prepared.height > prepared.width ? 800 : null,
+      );
+    }
     final tempFile = File(
       '${Directory.systemTemp.path}/inksplash_${DateTime.now().microsecondsSinceEpoch}_$normalizedRotation.png',
     );
-    await tempFile.writeAsBytes(img.encodePng(rotated), flush: true);
+    await tempFile.writeAsBytes(img.encodePng(prepared), flush: true);
     return _UploadFile(
       path: tempFile.path,
       fileName: 'inksplash_${normalizedRotation}_${picked.name}.png',

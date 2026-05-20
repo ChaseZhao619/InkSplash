@@ -41,7 +41,9 @@ class AppStrings {
       isZh ? '验证码必须是 6 位数字或字母。' : 'Code must be 6 letters or digits.';
   String get currentCanvas => isZh ? '当前画布' : 'Current canvas';
   String get noPreview => isZh ? '还没有图片预览' : 'No image preview yet';
-  String get chooseUploadAssign => isZh ? '选择图片并下发' : 'Choose image and send';
+  String get chooseImage => isZh ? '选择图片' : 'Choose image';
+  String get sendToFrame => isZh ? '下发到相框' : 'Send to frame';
+  String get chooseUploadAssign => sendToFrame;
   String get targetDevice => isZh ? '目标设备' : 'Target device';
   String get selectTargetDevice => isZh ? '选择目标设备' : 'Select target device';
   String get noDeviceAvailable => isZh ? '暂无可用设备' : 'No device available';
@@ -178,6 +180,8 @@ class AppStrings {
       isZh ? '请先扫描设备二维码' : 'Scan the device QR code first';
   String get selectBindDeviceFirst =>
       isZh ? '请先选择或绑定设备。' : 'Select or bind a device first.';
+  String get selectImageFirst =>
+      isZh ? '请先选择图片并确认预览。' : 'Choose an image and review the preview first.';
   String get invalidQrPayload => isZh ? '二维码无效' : 'Invalid QR payload';
   String get invalidClaimCodeHelp => isZh
       ? '设备绑定码无效或设备已被绑定。请确认二维码里的 device_id 和 claim_code 来自同一台设备，且服务端使用了正确的 DEVICE_CLAIM_HMAC_SECRET。'
@@ -214,6 +218,7 @@ class AppStrings {
   String get softApSearchAction => isZh ? '搜索 SoftAP' : 'SoftAP search';
   String get softApConnectAction => isZh ? '连接 SoftAP' : 'SoftAP connect';
   String get provisionClaimAction => isZh ? '配网绑定' : 'Provision and claim';
+  String get chooseImageAction => isZh ? '选择图片' : 'Choose image';
   String get uploadAssignAction => isZh ? '上传下发' : 'Upload and assign';
   String get savedLoginExpired => isZh ? '已保存登录已过期' : 'Saved login expired';
 }

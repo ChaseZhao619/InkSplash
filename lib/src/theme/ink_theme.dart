@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 
 class InkTheme {
   static ThemeData light() {
-    const ink = Color(0xff17211f);
-    const paper = Color(0xfff7f5ef);
-    const sage = Color(0xff3f6f65);
-    const warm = Color(0xffb58a4a);
+    const ink = Color(0xff0d0d0f);
+    const paper = Color(0xfffaf9f6);
+    const blue = Color(0xff2d5bff);
+    const warm = Color(0xffd4a64a);
 
     final scheme = ColorScheme.fromSeed(
-      seedColor: sage,
+      seedColor: blue,
       brightness: Brightness.light,
-      primary: sage,
+      primary: blue,
       secondary: warm,
-      surface: const Color(0xfffffdf8),
+      surface: const Color(0xfffffdfb),
       onSurface: ink,
     );
 
@@ -32,8 +32,15 @@ class InkTheme {
         centerTitle: false,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: const Color(0xfffffdf8),
-        indicatorColor: sage.withValues(alpha: 0.14),
+        backgroundColor: const Color(0xfffffdfb),
+        indicatorColor: blue.withValues(alpha: 0.10),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            color: states.contains(WidgetState.selected)
+                ? blue
+                : ink.withValues(alpha: 0.62),
+          ),
+        ),
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => TextStyle(
             fontSize: 12,
@@ -44,12 +51,13 @@ class InkTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        color: const Color(0xfffffdf8),
-        elevation: 0,
+        color: const Color(0xfffffdfb),
+        elevation: 2,
+        shadowColor: ink.withValues(alpha: 0.05),
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: ink.withValues(alpha: 0.08)),
+          side: BorderSide(color: ink.withValues(alpha: 0.07)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -62,7 +70,7 @@ class InkTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: sage, width: 1.4),
+          borderSide: const BorderSide(color: blue, width: 1.4),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(

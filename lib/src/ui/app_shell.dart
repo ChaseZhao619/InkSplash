@@ -371,10 +371,26 @@ class _HomePage extends StatelessWidget {
               const SizedBox(height: 14),
               _ImageOptions(controller: controller),
               const SizedBox(height: 14),
-              FilledButton.icon(
-                onPressed: () => controller.uploadAndAssign(s),
-                icon: const Icon(Icons.upload_file),
-                label: Text(s.chooseUploadAssign),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => controller.chooseImage(s),
+                      icon: const Icon(Icons.add_photo_alternate_outlined),
+                      label: Text(s.chooseImage),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: controller.selectedImage == null
+                          ? null
+                          : () => controller.uploadAndAssign(s),
+                      icon: const Icon(Icons.send_outlined),
+                      label: Text(s.sendToFrame),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
