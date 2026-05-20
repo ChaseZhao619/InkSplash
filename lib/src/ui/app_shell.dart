@@ -86,17 +86,30 @@ class _AppShellState extends State<AppShell> {
         ];
         return Scaffold(
           appBar: AppBar(
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            title: Row(
               children: [
-                Text(
-                  s.appName,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                Image.asset(
+                  'UI/logo.png',
+                  width: 34,
+                  height: 34,
+                  fit: BoxFit.contain,
                 ),
-                Text(
-                  s.galleryTone,
-                  style: Theme.of(context).textTheme.bodySmall,
-                  overflow: TextOverflow.ellipsis,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.appName,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      Text(
+                        s.galleryTone,
+                        style: Theme.of(context).textTheme.bodySmall,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -182,17 +195,37 @@ class _AuthPageState extends State<_AuthPage> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 460),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Row(
+                children: [
+                  Image.asset(
+                    'UI/logo.png',
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      s.appName,
+                      style: Theme.of(context).textTheme.headlineLarge
+                          ?.copyWith(fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
               Text(
-                s.appName,
-                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                  fontWeight: FontWeight.w900,
+                s.galleryTone,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Text(
                 isRegister
                     ? s.createAccount
@@ -203,20 +236,20 @@ class _AuthPageState extends State<_AuthPage> {
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(s.signInSubtitle),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               if (!isReset && !isRegister) ...[
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: Image.asset(
                     'assets/demo/album_cover.png',
-                    height: 82,
+                    height: 48,
                     width: double.infinity,
                     fit: BoxFit.cover,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
@@ -236,7 +269,7 @@ class _AuthPageState extends State<_AuthPage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
               ],
               if (!isReset) ...[
                 TextField(
@@ -244,18 +277,18 @@ class _AuthPageState extends State<_AuthPage> {
                   keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(labelText: s.email),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 TextField(
                   controller: controller.passwordController,
                   obscureText: true,
                   decoration: InputDecoration(labelText: s.password),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 10),
                 FilledButton(
                   onPressed: () => controller.login(s, register: isRegister),
                   child: Text(isRegister ? s.createAccount : s.login),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 6),
                 TextButton(
                   onPressed: () => setState(
                     () => _mode = isRegister
