@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart' hide ImageInfo;
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -88,8 +90,11 @@ class _AppShellState extends State<AppShell> {
         ];
         return Scaffold(
           backgroundColor: InkTheme.paperWhite,
+          extendBody: true,
           appBar: AppBar(
+            backgroundColor: InkTheme.paperWhite.withValues(alpha: 0.74),
             toolbarHeight: 74,
+            flexibleSpace: const _GlassWash(radius: 0),
             title: Row(
               children: [
                 Image.asset(
@@ -134,36 +139,46 @@ class _AppShellState extends State<AppShell> {
               ),
             ),
           ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _index,
-            onDestinationSelected: (value) => setState(() => _index = value),
-            destinations: [
-              NavigationDestination(
-                icon: const Icon(Icons.home_outlined),
-                selectedIcon: const Icon(Icons.home),
-                label: s.home,
+          bottomNavigationBar: SafeArea(
+            minimum: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+            child: _GlassShell(
+              radius: 28,
+              opacity: 0.56,
+              borderOpacity: 0.16,
+              child: NavigationBar(
+                backgroundColor: Colors.transparent,
+                selectedIndex: _index,
+                onDestinationSelected: (value) =>
+                    setState(() => _index = value),
+                destinations: [
+                  NavigationDestination(
+                    icon: const Icon(Icons.home_outlined),
+                    selectedIcon: const Icon(Icons.home),
+                    label: s.home,
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.photo_library_outlined),
+                    selectedIcon: const Icon(Icons.photo_library),
+                    label: s.albums,
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.schedule_outlined),
+                    selectedIcon: const Icon(Icons.schedule),
+                    label: s.timeline,
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.send_outlined),
+                    selectedIcon: const Icon(Icons.send),
+                    label: s.send,
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.person_outline),
+                    selectedIcon: const Icon(Icons.person),
+                    label: s.me,
+                  ),
+                ],
               ),
-              NavigationDestination(
-                icon: const Icon(Icons.photo_library_outlined),
-                selectedIcon: const Icon(Icons.photo_library),
-                label: s.albums,
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.schedule_outlined),
-                selectedIcon: const Icon(Icons.schedule),
-                label: s.timeline,
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.send_outlined),
-                selectedIcon: const Icon(Icons.send),
-                label: s.send,
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.person_outline),
-                selectedIcon: const Icon(Icons.person),
-                label: s.me,
-              ),
-            ],
+            ),
           ),
         );
       },
@@ -241,7 +256,7 @@ class _AuthPageState extends State<_AuthPage> {
                       ),
                       const SizedBox(height: 6),
                       Text(s.signInSubtitle),
-                      if (!isReset && !isRegister) ...[
+                      if (!isReset && !isRegister && !compact) ...[
                         const SizedBox(height: 18),
                         Row(
                           children: [
@@ -1439,7 +1454,7 @@ class InkPageScaffold extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
           child: ListView.separated(
-            padding: padding ?? const EdgeInsets.fromLTRB(18, 12, 18, 28),
+            padding: padding ?? const EdgeInsets.fromLTRB(18, 12, 18, 110),
             itemCount: children.length,
             separatorBuilder: (_, _) => const SizedBox(height: 16),
             itemBuilder: (context, index) => children[index],
@@ -1498,6 +1513,90 @@ class _BusyRoute extends StatelessWidget {
   }
 }
 
+class _GlassWash extends StatelessWidget {
+  const _GlassWash({this.radius = 24});
+
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xbffffdf9), Color(0x8cffffff), Color(0x66f1efe8)],
+            ),
+          ),
+          child: SizedBox.expand(),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassShell extends StatelessWidget {
+  const _GlassShell({
+    required this.child,
+    this.radius = 24,
+    this.opacity = 0.64,
+    this.borderOpacity = 0.12,
+  });
+
+  final Widget child;
+  final double radius;
+  final double opacity;
+  final double borderOpacity;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          decoration: BoxDecoration(
+            color: InkTheme.paperSurface.withValues(alpha: opacity),
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.72),
+              width: 0.8,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: InkTheme.inkBlack.withValues(alpha: 0.07),
+                blurRadius: 28,
+                offset: const Offset(0, 14),
+              ),
+            ],
+          ),
+          foregroundDecoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(
+              color: InkTheme.inkBlack.withValues(alpha: borderOpacity),
+              width: 0.7,
+            ),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withValues(alpha: 0.28),
+                Colors.white.withValues(alpha: 0.06),
+                InkTheme.eInkBlue.withValues(alpha: 0.035),
+              ],
+            ),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
 class InkCard extends StatelessWidget {
   const InkCard({
     required this.child,
@@ -1514,25 +1613,10 @@ class InkCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final border = InkTheme.inkBlack.withValues(alpha: 0.065);
-    return Container(
-      decoration: BoxDecoration(
-        color: InkTheme.paperSurface.withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: border),
-        boxShadow: [
-          BoxShadow(
-            color: InkTheme.inkBlack.withValues(alpha: 0.045),
-            blurRadius: 26,
-            offset: const Offset(0, 14),
-          ),
-          BoxShadow(
-            color: Colors.white.withValues(alpha: 0.72),
-            blurRadius: 1,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
+    return _GlassShell(
+      radius: 22,
+      opacity: 0.72,
+      borderOpacity: 0.08,
       child: Padding(
         padding: padding,
         child: Column(
@@ -1602,31 +1686,55 @@ class InkButton extends StatelessWidget {
       return OutlinedButton(onPressed: onPressed, child: child);
     }
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: onPressed == null
-            ? null
-            : const LinearGradient(
-                colors: [Color(0xff376ff0), InkTheme.eInkBlue],
-              ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: onPressed == null
-            ? const []
-            : [
-                BoxShadow(
-                  color: InkTheme.eInkBlue.withValues(alpha: 0.22),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
+    return _GlassShell(
+      radius: 16,
+      opacity: onPressed == null ? 0.34 : 0.18,
+      borderOpacity: 0.10,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: onPressed == null
+              ? null
+              : const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xff6f9df2),
+                    Color(0xff4c7bd9),
+                    Color(0xff2858c8),
+                  ],
                 ),
-              ],
-      ),
-      child: FilledButton(
-        onPressed: onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: onPressed == null
+              ? const []
+              : [
+                  BoxShadow(
+                    color: InkTheme.eInkBlue.withValues(alpha: 0.24),
+                    blurRadius: 20,
+                    offset: const Offset(0, 9),
+                  ),
+                ],
         ),
-        child: child,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.white.withValues(alpha: onPressed == null ? 0.04 : 0.26),
+                Colors.transparent,
+              ],
+            ),
+          ),
+          child: FilledButton(
+            onPressed: onPressed,
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+            ),
+            child: child,
+          ),
+        ),
       ),
     );
   }
@@ -1859,36 +1967,44 @@ class _AuthBrandHero extends StatelessWidget {
                 ),
                 Padding(
                   padding: const EdgeInsets.all(22),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(subtitle),
-                      const SizedBox(height: 18),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: const [
-                          InkStatusPill(
-                            text: 'Paper-like calm',
-                            color: InkTheme.eInkBlue,
+                  child: _GlassShell(
+                    radius: 24,
+                    opacity: 0.50,
+                    borderOpacity: 0.09,
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            title,
+                            style: Theme.of(context).textTheme.headlineSmall,
                           ),
-                          InkStatusPill(
-                            text: 'Family sharing',
-                            color: InkTheme.eInkRed,
-                          ),
-                          InkStatusPill(
-                            text: 'Six-color e-ink',
-                            color: InkTheme.eInkYellow,
+                          const SizedBox(height: 8),
+                          Text(subtitle),
+                          const SizedBox(height: 18),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: const [
+                              InkStatusPill(
+                                text: 'Paper-like calm',
+                                color: InkTheme.eInkBlue,
+                              ),
+                              InkStatusPill(
+                                text: 'Family sharing',
+                                color: InkTheme.eInkRed,
+                              ),
+                              InkStatusPill(
+                                text: 'Six-color e-ink',
+                                color: InkTheme.eInkYellow,
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ],
