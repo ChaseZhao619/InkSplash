@@ -1,98 +1,254 @@
 import 'package:flutter/material.dart';
 
 class InkTheme {
-  static ThemeData light() {
-    const ink = Color(0xff0d0d0f);
-    const paper = Color(0xfffaf9f6);
-    const blue = Color(0xff2d5bff);
-    const warm = Color(0xffd4a64a);
+  static const inkBlack = Color(0xff0d0d0f);
+  static const softGray = Color(0xffa7a9ad);
+  static const paperWhite = Color(0xfffaf9f6);
+  static const paperSurface = Color(0xfffffdf9);
+  static const eInkBlue = Color(0xff4c7bd9);
+  static const eInkRed = Color(0xffd46a6a);
+  static const eInkYellow = Color(0xffe5c35a);
 
+  static ThemeData light() {
     final scheme = ColorScheme.fromSeed(
-      seedColor: blue,
+      seedColor: eInkBlue,
       brightness: Brightness.light,
-      primary: blue,
-      secondary: warm,
-      surface: const Color(0xfffffdfb),
-      onSurface: ink,
+      primary: eInkBlue,
+      secondary: eInkYellow,
+      tertiary: eInkRed,
+      surface: paperSurface,
+      onSurface: inkBlack,
+      error: eInkRed,
+    );
+
+    final baseText = Typography.material2021().black.apply(
+      bodyColor: inkBlack,
+      displayColor: inkBlack,
     );
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: paper,
+      scaffoldBackgroundColor: paperWhite,
       fontFamily: null,
-      textTheme: Typography.material2021().black.apply(
-        bodyColor: ink,
-        displayColor: ink,
+      textTheme: baseText.copyWith(
+        headlineLarge: baseText.headlineLarge?.copyWith(
+          fontSize: 34,
+          height: 1.18,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0,
+        ),
+        headlineMedium: baseText.headlineMedium?.copyWith(
+          fontSize: 28,
+          height: 1.22,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0,
+        ),
+        headlineSmall: baseText.headlineSmall?.copyWith(
+          fontSize: 24,
+          height: 1.25,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0,
+        ),
+        titleLarge: baseText.titleLarge?.copyWith(
+          fontSize: 20,
+          height: 1.3,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0,
+        ),
+        titleMedium: baseText.titleMedium?.copyWith(
+          fontSize: 16,
+          height: 1.35,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0,
+        ),
+        bodyMedium: baseText.bodyMedium?.copyWith(
+          height: 1.45,
+          color: inkBlack.withValues(alpha: 0.76),
+          letterSpacing: 0,
+        ),
+        bodySmall: baseText.bodySmall?.copyWith(
+          height: 1.35,
+          color: inkBlack.withValues(alpha: 0.54),
+          letterSpacing: 0,
+        ),
+        labelLarge: baseText.labelLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0,
+        ),
       ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: paper,
-        foregroundColor: ink,
+      appBarTheme: AppBarTheme(
+        backgroundColor: paperWhite,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: inkBlack,
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: false,
+        titleTextStyle: baseText.titleLarge?.copyWith(
+          color: inkBlack,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0,
+        ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: const Color(0xfffffdfb),
-        indicatorColor: blue.withValues(alpha: 0.10),
+        backgroundColor: paperSurface.withValues(alpha: 0.96),
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: eInkBlue.withValues(alpha: 0.12),
+        elevation: 0,
+        height: 72,
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
             color: states.contains(WidgetState.selected)
-                ? blue
-                : ink.withValues(alpha: 0.62),
+                ? eInkBlue
+                : inkBlack.withValues(alpha: 0.58),
+            size: 23,
           ),
         ),
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => TextStyle(
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: states.contains(WidgetState.selected)
                 ? FontWeight.w700
                 : FontWeight.w500,
+            letterSpacing: 0,
           ),
         ),
       ),
       cardTheme: CardThemeData(
-        color: const Color(0xfffffdfb),
-        elevation: 2,
-        shadowColor: ink.withValues(alpha: 0.05),
+        color: paperSurface,
+        elevation: 0,
+        shadowColor: inkBlack.withValues(alpha: 0.05),
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: ink.withValues(alpha: 0.07)),
+          borderRadius: BorderRadius.circular(22),
+          side: BorderSide(color: inkBlack.withValues(alpha: 0.07)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        fillColor: paperSurface,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 15,
+        ),
+        labelStyle: TextStyle(color: inkBlack.withValues(alpha: 0.58)),
+        helperStyle: TextStyle(color: inkBlack.withValues(alpha: 0.48)),
+        prefixIconColor: inkBlack.withValues(alpha: 0.48),
+        suffixIconColor: inkBlack.withValues(alpha: 0.48),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: ink.withValues(alpha: 0.16)),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: inkBlack.withValues(alpha: 0.12)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: blue, width: 1.4),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: eInkBlue, width: 1.35),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: inkBlack.withValues(alpha: 0.07)),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          minimumSize: const Size(48, 46),
+          backgroundColor: eInkBlue,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: softGray.withValues(alpha: 0.24),
+          disabledForegroundColor: inkBlack.withValues(alpha: 0.34),
+          elevation: 0,
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          minimumSize: const Size(48, 50),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          minimumSize: const Size(48, 46),
+          foregroundColor: inkBlack,
+          side: BorderSide(color: inkBlack.withValues(alpha: 0.12)),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          minimumSize: const Size(48, 50),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: eInkBlue,
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
+          ),
         ),
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: ButtonStyle(
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? eInkBlue.withValues(alpha: 0.11)
+                : paperSurface,
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? eInkBlue
+                : inkBlack.withValues(alpha: 0.72),
+          ),
+          side: WidgetStatePropertyAll(
+            BorderSide(color: inkBlack.withValues(alpha: 0.10)),
+          ),
           shape: WidgetStatePropertyAll(
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           ),
         ),
       ),
-      dividerTheme: DividerThemeData(color: ink.withValues(alpha: 0.1)),
+      chipTheme: ChipThemeData(
+        backgroundColor: paperSurface,
+        selectedColor: eInkBlue,
+        disabledColor: softGray.withValues(alpha: 0.18),
+        labelStyle: TextStyle(color: inkBlack.withValues(alpha: 0.72)),
+        secondaryLabelStyle: const TextStyle(color: Colors.white),
+        side: BorderSide(color: inkBlack.withValues(alpha: 0.08)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+      ),
+      listTileTheme: ListTileThemeData(
+        iconColor: inkBlack.withValues(alpha: 0.72),
+        textColor: inkBlack,
+        subtitleTextStyle: baseText.bodySmall,
+        titleTextStyle: baseText.titleSmall?.copyWith(
+          color: inkBlack,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0,
+        ),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: eInkBlue,
+        linearTrackColor: inkBlack.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? Colors.white
+              : paperSurface,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? eInkBlue
+              : softGray.withValues(alpha: 0.38),
+        ),
+        trackOutlineColor: WidgetStatePropertyAll(
+          inkBlack.withValues(alpha: 0.08),
+        ),
+      ),
+      dividerTheme: DividerThemeData(color: inkBlack.withValues(alpha: 0.08)),
     );
   }
 }

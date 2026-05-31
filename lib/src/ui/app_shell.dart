@@ -6,6 +6,7 @@ import '../../models.dart';
 import '../localization/app_strings.dart';
 import '../settings/language_preference.dart';
 import '../state/app_controller.dart';
+import '../theme/ink_theme.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({
@@ -55,6 +56,7 @@ class _AppShellState extends State<AppShell> {
       builder: (context, _) {
         if (_controller.session == null) {
           return Scaffold(
+            backgroundColor: InkTheme.paperWhite,
             body: SafeArea(
               child: Column(
                 children: [
@@ -85,7 +87,9 @@ class _AppShellState extends State<AppShell> {
           ),
         ];
         return Scaffold(
+          backgroundColor: InkTheme.paperWhite,
           appBar: AppBar(
+            toolbarHeight: 74,
             title: Row(
               children: [
                 Image.asset(
@@ -101,7 +105,10 @@ class _AppShellState extends State<AppShell> {
                     children: [
                       Text(
                         s.appName,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0,
+                        ),
                       ),
                       Text(
                         s.galleryTone,
@@ -190,181 +197,182 @@ class _AuthPageState extends State<_AuthPage> {
     final controller = widget.controller;
     final isRegister = _mode == _AuthMode.register;
     final isReset = _mode == _AuthMode.reset;
+    final compact = MediaQuery.sizeOf(context).height < 720;
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Image.asset(
-                    'UI/logo.png',
-                    width: 48,
-                    height: 48,
-                    fit: BoxFit.contain,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      s.appName,
-                      style: Theme.of(context).textTheme.headlineLarge
-                          ?.copyWith(fontWeight: FontWeight.w900),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                s.galleryTone,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.w700,
+    return _PaperSurface(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              24,
+              compact ? 10 : 22,
+              24,
+              compact ? 16 : 28,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _AuthBrandHero(
+                  title: isRegister
+                      ? s.createAccount
+                      : isReset
+                      ? s.forgotPassword
+                      : (s.isZh ? '开始使用 InkSplash' : 'Get started'),
+                  subtitle: isReset
+                      ? s.resetEmailHelp
+                      : (s.isZh
+                            ? '纸感电子墨水相册，把家人的珍贵时刻温柔保存。'
+                            : 'A calm color e-ink album for the memories you keep close.'),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                isRegister
-                    ? s.createAccount
-                    : isReset
-                    ? s.forgotPassword
-                    : s.welcomeBack,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 4),
-              Text(s.signInSubtitle),
-              const SizedBox(height: 8),
-              if (!isReset && !isRegister) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.asset(
-                    'assets/demo/album_cover.png',
-                    height: 48,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
+                SizedBox(height: compact ? 10 : 18),
+                InkCard(
+                  padding: EdgeInsets.all(compact ? 16 : 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        isRegister
+                            ? s.createAccount
+                            : isReset
+                            ? s.passwordReset
+                            : s.welcomeBack,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(s.signInSubtitle),
+                      if (!isReset && !isRegister) ...[
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkButton.secondary(
+                                onPressed: () {},
+                                icon: Icons.apple,
+                                label: 'Apple',
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: InkButton.secondary(
+                                onPressed: () {},
+                                icon: Icons.g_mobiledata,
+                                label: 'Google',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        _DividerLabel(text: s.isZh ? '或' : 'or'),
+                      ],
+                      if (!isReset) ...[
+                        const SizedBox(height: 18),
+                        InkTextField(
+                          controller: controller.emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          labelText: s.email,
+                          prefixIcon: Icons.mail_outline,
+                        ),
+                        const SizedBox(height: 12),
+                        InkTextField(
+                          controller: controller.passwordController,
+                          obscureText: true,
+                          labelText: s.password,
+                          prefixIcon: Icons.lock_outline,
+                        ),
+                        const SizedBox(height: 16),
+                        InkButton.primary(
+                          onPressed: () =>
+                              controller.login(s, register: isRegister),
+                          icon: isRegister
+                              ? Icons.person_add_alt_outlined
+                              : Icons.login,
+                          label: isRegister ? s.createAccount : s.login,
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () => setState(
+                            () => _mode = isRegister
+                                ? _AuthMode.login
+                                : _AuthMode.register,
+                          ),
+                          child: Text(isRegister ? s.haveAccount : s.noAccount),
+                        ),
+                        TextButton(
+                          onPressed: () =>
+                              setState(() => _mode = _AuthMode.reset),
+                          child: Text(s.forgotPassword),
+                        ),
+                      ] else ...[
+                        const SizedBox(height: 18),
+                        InkTextField(
+                          controller: controller.resetEmailController,
+                          keyboardType: TextInputType.emailAddress,
+                          labelText: s.resetEmail,
+                          helperText: s.resetEmailHelp,
+                          prefixIcon: Icons.mail_outline,
+                        ),
+                        const SizedBox(height: 12),
+                        InkButton.secondary(
+                          onPressed: () => controller.requestPasswordReset(s),
+                          icon: Icons.mark_email_read_outlined,
+                          label: s.sendCode,
+                        ),
+                        const SizedBox(height: 12),
+                        InkTextField(
+                          controller: controller.resetTokenController,
+                          textCapitalization: TextCapitalization.characters,
+                          inputFormatters: _codeFormatters,
+                          labelText: s.resetToken,
+                          helperText: s.codeHelp,
+                          prefixIcon: Icons.pin_outlined,
+                        ),
+                        const SizedBox(height: 12),
+                        InkTextField(
+                          controller: controller.resetPasswordController,
+                          obscureText: true,
+                          labelText: s.newPassword,
+                          prefixIcon: Icons.lock_reset,
+                        ),
+                        const SizedBox(height: 16),
+                        InkButton.primary(
+                          onPressed: () => controller.confirmPasswordReset(s),
+                          icon: Icons.password,
+                          label: s.resetPassword,
+                        ),
+                        const SizedBox(height: 10),
+                        TextButton(
+                          onPressed: () =>
+                              setState(() => _mode = _AuthMode.login),
+                          child: Text(s.backToLogin),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.apple),
-                        label: const Text('Apple'),
-                      ),
+                const SizedBox(height: 16),
+                SegmentedButton<LanguagePreference>(
+                  segments: [
+                    ButtonSegment(
+                      value: LanguagePreference.system,
+                      label: Text(s.followSystem),
+                      icon: const Icon(Icons.phone_iphone),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.g_mobiledata),
-                        label: const Text('Google'),
-                      ),
+                    ButtonSegment(
+                      value: LanguagePreference.zh,
+                      label: Text(s.simplifiedChinese),
+                    ),
+                    ButtonSegment(
+                      value: LanguagePreference.en,
+                      label: Text(s.english),
                     ),
                   ],
-                ),
-                const SizedBox(height: 8),
-              ],
-              if (!isReset) ...[
-                TextField(
-                  controller: controller.emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(labelText: s.email),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: controller.passwordController,
-                  obscureText: true,
-                  decoration: InputDecoration(labelText: s.password),
-                ),
-                const SizedBox(height: 10),
-                FilledButton(
-                  onPressed: () => controller.login(s, register: isRegister),
-                  child: Text(isRegister ? s.createAccount : s.login),
-                ),
-                const SizedBox(height: 6),
-                TextButton(
-                  onPressed: () => setState(
-                    () => _mode = isRegister
-                        ? _AuthMode.login
-                        : _AuthMode.register,
-                  ),
-                  child: Text(isRegister ? s.haveAccount : s.noAccount),
-                ),
-                TextButton(
-                  onPressed: () => setState(() => _mode = _AuthMode.reset),
-                  child: Text(s.forgotPassword),
-                ),
-              ] else ...[
-                TextField(
-                  controller: controller.resetEmailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: s.resetEmail,
-                    helperText: s.resetEmailHelp,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: () => controller.requestPasswordReset(s),
-                  icon: const Icon(Icons.mark_email_read_outlined),
-                  label: Text(s.sendCode),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: controller.resetTokenController,
-                  textCapitalization: TextCapitalization.characters,
-                  inputFormatters: _codeFormatters,
-                  decoration: InputDecoration(
-                    labelText: s.resetToken,
-                    helperText: s.codeHelp,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: controller.resetPasswordController,
-                  obscureText: true,
-                  decoration: InputDecoration(labelText: s.newPassword),
-                ),
-                const SizedBox(height: 18),
-                FilledButton(
-                  onPressed: () => controller.confirmPasswordReset(s),
-                  child: Text(s.resetPassword),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () => setState(() => _mode = _AuthMode.login),
-                  child: Text(s.backToLogin),
+                  selected: {widget.language},
+                  onSelectionChanged: (value) =>
+                      widget.onLanguageChanged(value.first),
                 ),
               ],
-              const SizedBox(height: 18),
-              SegmentedButton<LanguagePreference>(
-                segments: [
-                  ButtonSegment(
-                    value: LanguagePreference.system,
-                    label: Text(s.followSystem),
-                    icon: const Icon(Icons.phone_iphone),
-                  ),
-                  ButtonSegment(
-                    value: LanguagePreference.zh,
-                    label: Text(s.simplifiedChinese),
-                  ),
-                  ButtonSegment(
-                    value: LanguagePreference.en,
-                    label: Text(s.english),
-                  ),
-                ],
-                selected: {widget.language},
-                onSelectionChanged: (value) =>
-                    widget.onLanguageChanged(value.first),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -619,20 +627,20 @@ class _SendPage extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
+                    child: InkButton.secondary(
                       onPressed: () => controller.chooseImage(s),
-                      icon: const Icon(Icons.add_photo_alternate_outlined),
-                      label: Text(s.chooseImage),
+                      icon: Icons.add_photo_alternate_outlined,
+                      label: s.chooseImage,
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: FilledButton.icon(
+                    child: InkButton.primary(
                       onPressed: controller.selectedImage == null
                           ? null
                           : () => controller.uploadAndAssign(s),
-                      icon: const Icon(Icons.send_outlined),
-                      label: Text(s.sendToFrame),
+                      icon: Icons.send_outlined,
+                      label: s.sendToFrame,
                     ),
                   ),
                 ],
@@ -741,9 +749,10 @@ class _DevicesPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextField(
+                InkTextField(
                   controller: controller.renameController,
-                  decoration: InputDecoration(labelText: s.nickname),
+                  labelText: s.nickname,
+                  prefixIcon: Icons.edit_outlined,
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -779,20 +788,17 @@ class _DevicesPage extends StatelessWidget {
                 : Column(
                     children: [
                       for (final event in controller.statusEvents)
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.history),
-                          title: Text(event.status),
-                          subtitle: Text(
-                            [
-                              if (event.version != null) 'v${event.version}',
-                              if (event.error != null) event.error!,
-                              if (event.batteryMv != null)
-                                '${event.batteryMv} mV',
-                              if (event.rssi != null) '${event.rssi} dBm',
-                              if (event.createdAt != null) event.createdAt!,
-                            ].join(' | '),
-                          ),
+                        InkIconTile(
+                          icon: Icons.history,
+                          title: event.status,
+                          subtitle: [
+                            if (event.version != null) 'v${event.version}',
+                            if (event.error != null) event.error!,
+                            if (event.batteryMv != null)
+                              '${event.batteryMv} mV',
+                            if (event.rssi != null) '${event.rssi} dBm',
+                            if (event.createdAt != null) event.createdAt!,
+                          ].join(' | '),
                         ),
                     ],
                   ),
@@ -812,12 +818,10 @@ class _SharingEntryPanel extends StatelessWidget {
     final s = AppStrings.of(context);
     return _Panel(
       title: s.groups,
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: const Icon(Icons.group_outlined),
-        title: Text(s.manageSharing),
-        subtitle: Text(s.shareMembers),
-        trailing: const Icon(Icons.chevron_right),
+      child: InkIconTile(
+        icon: Icons.group_outlined,
+        title: s.manageSharing,
+        subtitle: s.shareMembers,
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => _BusyRoute(
@@ -856,9 +860,10 @@ class _SharingPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextField(
+                InkTextField(
                   controller: controller.groupNameController,
-                  decoration: InputDecoration(labelText: s.groupName),
+                  labelText: s.groupName,
+                  prefixIcon: Icons.group_outlined,
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
@@ -919,10 +924,11 @@ class _SharingPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextField(
+                InkTextField(
                   controller: controller.groupInviteEmailController,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(labelText: s.groupInviteEmail),
+                  labelText: s.groupInviteEmail,
+                  prefixIcon: Icons.mail_outline,
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
@@ -944,14 +950,13 @@ class _SharingPage extends StatelessWidget {
                   label: Text(s.inviteToGroup),
                 ),
                 const SizedBox(height: 14),
-                TextField(
+                InkTextField(
                   controller: controller.groupInviteCodeController,
                   textCapitalization: TextCapitalization.characters,
                   inputFormatters: _codeFormatters,
-                  decoration: InputDecoration(
-                    labelText: s.groupInviteCode,
-                    helperText: s.codeHelp,
-                  ),
+                  labelText: s.groupInviteCode,
+                  helperText: s.codeHelp,
+                  prefixIcon: Icons.pin_outlined,
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
@@ -978,11 +983,10 @@ class _SharingPage extends StatelessWidget {
                 : Column(
                     children: [
                       for (final member in controller.groupMembers)
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.person_outline),
-                          title: Text(member.email),
-                          subtitle: Text('${member.role} | ${member.userId}'),
+                        InkIconTile(
+                          icon: Icons.person_outline,
+                          title: member.email,
+                          subtitle: '${member.role} | ${member.userId}',
                         ),
                     ],
                   ),
@@ -1068,9 +1072,10 @@ class _AddDevicePage extends StatelessWidget {
                 _KeyValue(label: s.deviceId, value: payload.deviceId),
                 _KeyValue(label: s.transport, value: payload.transport),
                 const SizedBox(height: 12),
-                TextField(
+                InkTextField(
                   controller: controller.deviceNicknameController,
-                  decoration: InputDecoration(labelText: s.nickname),
+                  labelText: s.nickname,
+                  prefixIcon: Icons.edit_outlined,
                 ),
                 const SizedBox(height: 16),
                 _StepHeader(
@@ -1082,13 +1087,12 @@ class _AddDevicePage extends StatelessWidget {
                 if (payload.isSoftAp) ...[
                   Text(s.softApHint),
                   const SizedBox(height: 10),
-                  TextField(
+                  InkTextField(
                     controller: controller.softApPasswordController,
                     obscureText: true,
-                    decoration: InputDecoration(
-                      labelText: s.softApPassword,
-                      helperText: s.softApPasswordHelp,
-                    ),
+                    labelText: s.softApPassword,
+                    helperText: s.softApPasswordHelp,
+                    prefixIcon: Icons.wifi_password_outlined,
                   ),
                   const SizedBox(height: 10),
                 ],
@@ -1105,13 +1109,12 @@ class _AddDevicePage extends StatelessWidget {
                 ),
               ],
               for (final device in controller.provisioningDevices)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    payload?.isSoftAp == true ? Icons.wifi : Icons.bluetooth,
-                  ),
-                  title: Text(device.name),
-                  subtitle: Text(device.serviceUuid ?? s.noServiceUuid),
+                InkIconTile(
+                  icon: payload?.isSoftAp == true
+                      ? Icons.wifi
+                      : Icons.bluetooth,
+                  title: device.name,
+                  subtitle: device.serviceUuid ?? s.noServiceUuid,
                   trailing: IconButton(
                     icon: const Icon(Icons.link),
                     tooltip: s.connect,
@@ -1138,10 +1141,11 @@ class _AddDevicePage extends StatelessWidget {
                   decoration: InputDecoration(labelText: s.wifiNetwork),
                 ),
                 const SizedBox(height: 10),
-                TextField(
+                InkTextField(
                   controller: controller.wifiPasswordController,
                   obscureText: true,
-                  decoration: InputDecoration(labelText: s.wifiPassword),
+                  labelText: s.wifiPassword,
+                  prefixIcon: Icons.lock_outline,
                 ),
                 const SizedBox(height: 16),
                 FilledButton.icon(
@@ -1190,11 +1194,9 @@ class _SettingsPage extends StatelessWidget {
                       ),
               ),
               const SizedBox(height: 12),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.lock_reset),
-                title: Text(s.passwordReset),
-                trailing: const Icon(Icons.chevron_right),
+              InkIconTile(
+                icon: Icons.lock_reset,
+                title: s.passwordReset,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => _BusyRoute(
@@ -1224,14 +1226,13 @@ class _SettingsPage extends StatelessWidget {
                   label: Text(s.sendVerificationEmail),
                 ),
                 const SizedBox(height: 10),
-                TextField(
+                InkTextField(
                   controller: controller.verifyEmailTokenController,
                   textCapitalization: TextCapitalization.characters,
                   inputFormatters: _codeFormatters,
-                  decoration: InputDecoration(
-                    labelText: s.verificationToken,
-                    helperText: s.codeHelp,
-                  ),
+                  labelText: s.verificationToken,
+                  helperText: s.codeHelp,
+                  prefixIcon: Icons.pin_outlined,
                 ),
                 const SizedBox(height: 12),
                 FilledButton.icon(
@@ -1266,13 +1267,11 @@ class _SettingsPage extends StatelessWidget {
         ),
         _Panel(
           title: s.advanced,
-          child: TextField(
+          child: InkTextField(
             controller: controller.baseUrlController,
             enabled: !controller.busy,
-            decoration: InputDecoration(
-              labelText: s.serverBaseUrl,
-              prefixIcon: const Icon(Icons.cloud_outlined),
-            ),
+            labelText: s.serverBaseUrl,
+            prefixIcon: Icons.cloud_outlined,
           ),
         ),
       ],
@@ -1297,13 +1296,12 @@ class _PasswordResetPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextField(
+                InkTextField(
                   controller: controller.resetEmailController,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: s.resetEmail,
-                    helperText: s.resetEmailHelp,
-                  ),
+                  labelText: s.resetEmail,
+                  helperText: s.resetEmailHelp,
+                  prefixIcon: Icons.mail_outline,
                 ),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
@@ -1312,20 +1310,20 @@ class _PasswordResetPage extends StatelessWidget {
                   label: Text(s.sendCode),
                 ),
                 const SizedBox(height: 10),
-                TextField(
+                InkTextField(
                   controller: controller.resetTokenController,
                   textCapitalization: TextCapitalization.characters,
                   inputFormatters: _codeFormatters,
-                  decoration: InputDecoration(
-                    labelText: s.resetToken,
-                    helperText: s.codeHelp,
-                  ),
+                  labelText: s.resetToken,
+                  helperText: s.codeHelp,
+                  prefixIcon: Icons.pin_outlined,
                 ),
                 const SizedBox(height: 10),
-                TextField(
+                InkTextField(
                   controller: controller.resetPasswordController,
                   obscureText: true,
-                  decoration: InputDecoration(labelText: s.newPassword),
+                  labelText: s.newPassword,
+                  prefixIcon: Icons.lock_reset,
                 ),
                 const SizedBox(height: 12),
                 FilledButton.icon(
@@ -1382,6 +1380,76 @@ class _QrScannerPageState extends State<QrScannerPage> {
   }
 }
 
+class _PaperSurface extends StatelessWidget {
+  const _PaperSurface({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(color: InkTheme.paperWhite),
+      child: CustomPaint(painter: _PaperTexturePainter(), child: child),
+    );
+  }
+}
+
+class _PaperTexturePainter extends CustomPainter {
+  const _PaperTexturePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final warmWash = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xfffffdf8), Color(0xfff7f3eb)],
+      ).createShader(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, warmWash);
+
+    final fiber = Paint()
+      ..color = InkTheme.inkBlack.withValues(alpha: 0.018)
+      ..strokeWidth = 0.6;
+    for (double y = 18; y < size.height; y += 31) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y + 5), fiber);
+    }
+    final speck = Paint()..color = InkTheme.eInkYellow.withValues(alpha: 0.03);
+    for (double x = 12; x < size.width; x += 37) {
+      for (double y = 10; y < size.height; y += 43) {
+        canvas.drawCircle(Offset(x, y), 0.7, speck);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class InkPageScaffold extends StatelessWidget {
+  const InkPageScaffold({required this.children, this.padding, super.key});
+
+  final List<Widget> children;
+  final EdgeInsetsGeometry? padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PaperSurface(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: ListView.separated(
+            padding: padding ?? const EdgeInsets.fromLTRB(18, 12, 18, 28),
+            itemCount: children.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 16),
+            itemBuilder: (context, index) => children[index],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _PageScaffold extends StatelessWidget {
   const _PageScaffold({required this.children});
 
@@ -1389,12 +1457,7 @@ class _PageScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-      itemCount: children.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 14),
-      itemBuilder: (context, index) => children[index],
-    );
+    return InkPageScaffold(children: children);
   }
 }
 
@@ -1435,6 +1498,407 @@ class _BusyRoute extends StatelessWidget {
   }
 }
 
+class InkCard extends StatelessWidget {
+  const InkCard({
+    required this.child,
+    this.title,
+    this.action,
+    this.padding = const EdgeInsets.all(18),
+    super.key,
+  });
+
+  final String? title;
+  final Widget child;
+  final Widget? action;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final border = InkTheme.inkBlack.withValues(alpha: 0.065);
+    return Container(
+      decoration: BoxDecoration(
+        color: InkTheme.paperSurface.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: border),
+        boxShadow: [
+          BoxShadow(
+            color: InkTheme.inkBlack.withValues(alpha: 0.045),
+            blurRadius: 26,
+            offset: const Offset(0, 14),
+          ),
+          BoxShadow(
+            color: Colors.white.withValues(alpha: 0.72),
+            blurRadius: 1,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: padding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (title != null || action != null) ...[
+              Row(
+                children: [
+                  if (title != null)
+                    Expanded(
+                      child: Text(
+                        title!,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                    )
+                  else
+                    const Spacer(),
+                  ?action,
+                ],
+              ),
+              const SizedBox(height: 14),
+            ],
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class InkButton extends StatelessWidget {
+  const InkButton.primary({
+    required this.onPressed,
+    required this.label,
+    this.icon,
+    super.key,
+  }) : primary = true;
+
+  const InkButton.secondary({
+    required this.onPressed,
+    required this.label,
+    this.icon,
+    super.key,
+  }) : primary = false;
+
+  final VoidCallback? onPressed;
+  final String label;
+  final IconData? icon;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[Icon(icon, size: 19), const SizedBox(width: 8)],
+        Flexible(
+          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+      ],
+    );
+
+    if (!primary) {
+      return OutlinedButton(onPressed: onPressed, child: child);
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: onPressed == null
+            ? null
+            : const LinearGradient(
+                colors: [Color(0xff376ff0), InkTheme.eInkBlue],
+              ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: onPressed == null
+            ? const []
+            : [
+                BoxShadow(
+                  color: InkTheme.eInkBlue.withValues(alpha: 0.22),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+      ),
+      child: FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+class InkTextField extends StatelessWidget {
+  const InkTextField({
+    required this.controller,
+    required this.labelText,
+    this.helperText,
+    this.prefixIcon,
+    this.keyboardType,
+    this.obscureText = false,
+    this.enabled,
+    this.textCapitalization = TextCapitalization.none,
+    this.inputFormatters,
+    super.key,
+  });
+
+  final TextEditingController controller;
+  final String labelText;
+  final String? helperText;
+  final IconData? prefixIcon;
+  final TextInputType? keyboardType;
+  final bool obscureText;
+  final bool? enabled;
+  final TextCapitalization textCapitalization;
+  final List<TextInputFormatter>? inputFormatters;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      enabled: enabled,
+      textCapitalization: textCapitalization,
+      inputFormatters: inputFormatters,
+      decoration: InputDecoration(
+        labelText: labelText,
+        helperText: helperText,
+        prefixIcon: prefixIcon == null ? null : Icon(prefixIcon),
+      ),
+    );
+  }
+}
+
+class InkIconTile extends StatelessWidget {
+  const InkIconTile({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+    this.dotColor,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final Color? dotColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      minLeadingWidth: 36,
+      leading: _LineIcon(icon: icon, dotColor: dotColor),
+      title: Text(title, overflow: TextOverflow.ellipsis),
+      subtitle: subtitle == null
+          ? null
+          : Text(subtitle!, maxLines: 2, overflow: TextOverflow.ellipsis),
+      trailing:
+          trailing ?? (onTap == null ? null : const Icon(Icons.chevron_right)),
+      onTap: onTap,
+    );
+  }
+}
+
+class _LineIcon extends StatelessWidget {
+  const _LineIcon({required this.icon, this.dotColor});
+
+  final IconData icon;
+  final Color? dotColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: InkTheme.paperWhite,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: InkTheme.inkBlack.withValues(alpha: 0.07),
+            ),
+          ),
+          child: Icon(icon, size: 20),
+        ),
+        if (dotColor != null)
+          Positioned(
+            right: -1,
+            top: -1,
+            child: CircleAvatar(radius: 4, backgroundColor: dotColor),
+          ),
+      ],
+    );
+  }
+}
+
+class InkStatusPill extends StatelessWidget {
+  const InkStatusPill({required this.text, required this.color, super.key});
+
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.20)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _DividerLabel extends StatelessWidget {
+  const _DividerLabel({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(child: Divider()),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(text, style: Theme.of(context).textTheme.bodySmall),
+        ),
+        const Expanded(child: Divider()),
+      ],
+    );
+  }
+}
+
+class _AuthBrandHero extends StatelessWidget {
+  const _AuthBrandHero({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    final compact = MediaQuery.sizeOf(context).height < 720;
+    final heroHeight = compact ? 128.0 : 260.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Image.asset('UI/logo.png', width: 58, height: 58),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    s.appName,
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
+                  Text(
+                    'Color E-Ink Photo Album',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.copyWith(color: InkTheme.eInkBlue),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        if (compact) ...[
+          Text(title, style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 6),
+          Text(subtitle),
+        ] else
+          ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: Stack(
+              alignment: Alignment.bottomLeft,
+              children: [
+                Image.asset(
+                  'assets/demo/album_cover.png',
+                  height: heroHeight,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+                Container(
+                  height: heroHeight,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        InkTheme.paperWhite.withValues(alpha: 0.96),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(22),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(subtitle),
+                      const SizedBox(height: 18),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: const [
+                          InkStatusPill(
+                            text: 'Paper-like calm',
+                            color: InkTheme.eInkBlue,
+                          ),
+                          InkStatusPill(
+                            text: 'Family sharing',
+                            color: InkTheme.eInkRed,
+                          ),
+                          InkStatusPill(
+                            text: 'Six-color e-ink',
+                            color: InkTheme.eInkYellow,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _Panel extends StatelessWidget {
   const _Panel({required this.title, required this.child, this.action});
 
@@ -1444,31 +1908,7 @@ class _Panel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                ?action,
-              ],
-            ),
-            const SizedBox(height: 12),
-            child,
-          ],
-        ),
-      ),
-    );
+    return InkCard(title: title, action: action, child: child);
   }
 }
 
@@ -1488,34 +1928,46 @@ class _HeroPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colors.onSurface.withValues(alpha: 0.08)),
-      ),
-      padding: const EdgeInsets.all(16),
+    return InkCard(
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 5),
+                    Text(subtitle, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+              const InkStatusPill(text: '6-color', color: InkTheme.eInkBlue),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(subtitle, overflow: TextOverflow.ellipsis),
           const SizedBox(height: 16),
           AspectRatio(
             aspectRatio: 480 / 800,
-            child: DecoratedBox(
+            child: Container(
               decoration: BoxDecoration(
                 color: const Color(0xffefede6),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(24),
                 border: Border.all(
                   color: colors.onSurface.withValues(alpha: 0.10),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: InkTheme.inkBlack.withValues(alpha: 0.07),
+                    blurRadius: 22,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
               child: preview == null
                   ? Center(
@@ -1527,7 +1979,7 @@ class _HeroPanel extends StatelessWidget {
                       ),
                     )
                   : ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(23),
                       child: Image.memory(
                         Uint8List.fromList(preview!),
                         fit: BoxFit.contain,
@@ -1595,11 +2047,29 @@ class _ImageOptions extends StatelessWidget {
           selected: {controller.mode},
           onSelectionChanged: (values) => controller.setMode(values.first),
         ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          value: controller.dither,
-          onChanged: controller.setDither,
-          title: Text(s.dither),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: InkTheme.paperWhite,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: InkTheme.inkBlack.withValues(alpha: 0.07),
+            ),
+          ),
+          child: Row(
+            children: [
+              const _LineIcon(icon: Icons.grain_outlined),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  s.dither,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              Switch(value: controller.dither, onChanged: controller.setDither),
+            ],
+          ),
         ),
       ],
     );
@@ -1621,11 +2091,11 @@ class _HeaderBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
+      padding: const EdgeInsets.fromLTRB(2, 12, 2, 4),
       child: Row(
         children: [
-          Icon(icon, color: colors.primary, size: 30),
-          const SizedBox(width: 12),
+          _LineIcon(icon: icon, dotColor: InkTheme.eInkYellow),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1642,7 +2112,10 @@ class _HeaderBlock extends StatelessWidget {
               ],
             ),
           ),
-          Icon(Icons.notifications_none, color: colors.onSurface),
+          IconButton(
+            onPressed: () {},
+            icon: Icon(Icons.notifications_none, color: colors.onSurface),
+          ),
         ],
       ),
     );
@@ -1666,13 +2139,13 @@ class _AlbumCoverCard extends StatelessWidget {
       width: compact ? 118 : null,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(18),
                 child: Image.asset(
                   album.asset,
                   fit: BoxFit.cover,
@@ -1680,7 +2153,7 @@ class _AlbumCoverCard extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 7),
+            const SizedBox(height: 9),
             Text(
               album.titleZh,
               maxLines: 1,
@@ -1751,24 +2224,26 @@ class _DeviceSyncCard extends StatelessWidget {
         onPressed: () => controller.refreshDevices(s),
         icon: const Icon(Icons.refresh),
       ),
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: Image.asset(
-            'assets/demo/frame_preview.png',
-            width: 42,
-            height: 58,
-            fit: BoxFit.cover,
+      child: InkIconTile(
+        icon: Icons.tablet_mac_outlined,
+        title: device == null ? 'InkPad Color 6' : _deviceTitle(device),
+        subtitle: device == null
+            ? '已连接 · 电量 78%'
+            : '${device.lastStatus ?? 'online'} · v${device.currentVersion ?? 0}',
+        dotColor: InkTheme.eInkBlue,
+        trailing: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            color: InkTheme.paperWhite,
+            padding: const EdgeInsets.all(4),
+            child: Image.asset(
+              'assets/demo/frame_preview.png',
+              width: 34,
+              height: 46,
+              fit: BoxFit.cover,
+            ),
           ),
         ),
-        title: Text(device == null ? 'InkPad Color 6' : _deviceTitle(device)),
-        subtitle: Text(
-          device == null
-              ? '已连接 · 电量 78%'
-              : '${device.lastStatus ?? 'online'} · v${device.currentVersion ?? 0}',
-        ),
-        trailing: const Icon(Icons.chevron_right),
       ),
     );
   }
@@ -1789,15 +2264,15 @@ class _UpdateTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: Image.asset(image, width: 52, height: 52, fit: BoxFit.cover),
+    return InkIconTile(
+      icon: Icons.image_outlined,
+      title: title,
+      subtitle: subtitle,
+      dotColor: dotColor,
+      trailing: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.asset(image, width: 50, height: 50, fit: BoxFit.cover),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-      subtitle: Text(subtitle),
-      trailing: CircleAvatar(radius: 4, backgroundColor: dotColor),
     );
   }
 }
@@ -1811,17 +2286,21 @@ class _FilterChips extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return SizedBox(
-      height: 38,
+      height: 40,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: labels.length,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, index) => Chip(
+        itemBuilder: (context, index) => ChoiceChip(
+          selected: index == 0,
+          showCheckmark: false,
           label: Text(labels[index]),
           side: BorderSide(color: colors.onSurface.withValues(alpha: 0.08)),
-          backgroundColor: index == 0 ? colors.primary : colors.surface,
+          selectedColor: colors.primary,
+          backgroundColor: colors.surface,
           labelStyle: TextStyle(
             color: index == 0 ? Colors.white : colors.onSurface,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -1843,7 +2322,7 @@ class _PhotoStrip extends StatelessWidget {
         itemCount: assets.length,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, index) => ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(18),
           child: Image.asset(
             assets[index],
             width: 112,
@@ -1869,7 +2348,7 @@ class _AlbumDetailPage extends StatelessWidget {
       body: _PageScaffold(
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(24),
             child: Image.asset(
               album.asset,
               height: 220,
@@ -1902,7 +2381,7 @@ class _AlbumDetailPage extends StatelessWidget {
             ),
             itemCount: _demoPhotos.length,
             itemBuilder: (context, index) => ClipRRect(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(14),
               child: Image.asset(_demoPhotos[index], fit: BoxFit.cover),
             ),
           ),
@@ -1946,14 +2425,10 @@ class _ProgressStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      dense: true,
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(
-        done ? Icons.check_circle : Icons.radio_button_unchecked,
-        color: done ? Colors.green : Theme.of(context).colorScheme.primary,
-      ),
-      title: Text(title),
+    return InkIconTile(
+      icon: done ? Icons.check_circle_outline : Icons.radio_button_unchecked,
+      title: title,
+      dotColor: done ? InkTheme.eInkBlue : null,
     );
   }
 }
@@ -1965,20 +2440,38 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Panel(
-      title: 'Emily',
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: const CircleAvatar(
-          backgroundImage: AssetImage('assets/demo/avatar_emily.png'),
-          radius: 28,
-        ),
-        title: const Text(
-          'Emily',
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
-        subtitle: Text(email),
-        trailing: const Icon(Icons.chevron_right),
+    return InkCard(
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: InkTheme.eInkBlue.withValues(alpha: 0.22),
+              ),
+            ),
+            child: const CircleAvatar(
+              backgroundImage: AssetImage('assets/demo/avatar_emily.png'),
+              radius: 30,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Emily',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                ),
+                const SizedBox(height: 3),
+                Text(email, overflow: TextOverflow.ellipsis),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right),
+        ],
       ),
     );
   }
@@ -2003,16 +2496,19 @@ class _SettingsList extends StatelessWidget {
         Icons.security_outlined,
         s.isZh ? '账号与安全' : 'Account & security',
         s.isZh ? '修改密码 / 登录状态' : 'Password and sessions',
+        null,
       ],
       [
         Icons.notifications_none,
         s.isZh ? '通知设置' : 'Notifications',
         s.isZh ? '消息提醒 / 同步通知' : 'Alerts and sync',
+        InkTheme.eInkRed,
       ],
       [
         Icons.cloud_queue_outlined,
         s.isZh ? '存储与空间' : 'Storage',
         '2.3 GB / 10 GB',
+        null,
       ],
       [
         Icons.devices_outlined,
@@ -2020,21 +2516,25 @@ class _SettingsList extends StatelessWidget {
         s.isZh
             ? '已连接 ${controller.devices.length} 台设备'
             : '${controller.devices.length} devices connected',
+        InkTheme.eInkBlue,
       ],
       [
         Icons.lock_outline,
         s.isZh ? '隐私设置' : 'Privacy',
         s.isZh ? '权限管理 / 可见性' : 'Permissions and visibility',
+        null,
       ],
       [
         Icons.help_outline,
         s.isZh ? '帮助与反馈' : 'Help & feedback',
         s.isZh ? '常见问题与反馈' : 'FAQ and feedback',
+        null,
       ],
       [
         Icons.info_outline,
         s.isZh ? '关于 InkSplash' : 'About InkSplash',
         'v1.0.10',
+        InkTheme.eInkYellow,
       ],
     ];
     return _Panel(
@@ -2059,14 +2559,14 @@ class _SettingsList extends StatelessWidget {
             selected: {language},
             onSelectionChanged: (value) => onLanguageChanged(value.first),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           for (final row in rows)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(row[0] as IconData),
-              title: Text(row[1] as String),
-              subtitle: Text(row[2] as String),
-              trailing: const Icon(Icons.chevron_right),
+            InkIconTile(
+              icon: row[0] as IconData,
+              title: row[1] as String,
+              subtitle: row[2] as String,
+              dotColor: row[3] as Color?,
+              onTap: () {},
             ),
         ],
       ),
@@ -2196,24 +2696,24 @@ class _DeviceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = AppStrings.of(context);
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      selected: selected,
-      leading: Icon(
-        selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+    return InkIconTile(
+      icon: selected
+          ? Icons.radio_button_checked
+          : Icons.radio_button_unchecked,
+      title: _deviceTitle(device),
+      subtitle: [
+        if (device.role != null) '${s.role} ${device.role}',
+        '${s.version} ${device.currentVersion ?? 0}',
+        if (device.lastStatus != null) '${s.status} ${device.lastStatus}',
+        if (device.batteryMv != null) '${device.batteryMv} mV',
+        if (device.rssi != null) '${device.rssi} dBm',
+      ].join(' | '),
+      dotColor: selected ? InkTheme.eInkBlue : null,
+      trailing: Icon(
+        selected ? Icons.check_circle : Icons.chevron_right,
+        color: selected ? InkTheme.eInkBlue : null,
       ),
       onTap: onTap,
-      title: Text(_deviceTitle(device), overflow: TextOverflow.ellipsis),
-      subtitle: Text(
-        [
-          if (device.role != null) '${s.role} ${device.role}',
-          '${s.version} ${device.currentVersion ?? 0}',
-          if (device.lastStatus != null) '${s.status} ${device.lastStatus}',
-          if (device.batteryMv != null) '${device.batteryMv} mV',
-          if (device.rssi != null) '${device.rssi} dBm',
-        ].join(' | '),
-        overflow: TextOverflow.ellipsis,
-      ),
     );
   }
 }
@@ -2262,7 +2762,7 @@ class _MessageBanner extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Material(
         color: colors.secondaryContainer.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(padding: const EdgeInsets.all(12), child: Text(message)),
       ),
     );
