@@ -2,17 +2,23 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart' hide ImageInfo;
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../models.dart';
 import '../../services/api_client.dart';
+import '../../services/album_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/device_service.dart';
 import '../../services/group_service.dart';
 import '../../services/image_service.dart';
+import '../../services/notification_service.dart';
+import '../../services/profile_service.dart';
 import '../../services/provisioning_service.dart';
 import '../../services/session_store.dart';
+import '../../services/timeline_service.dart';
 import '../localization/app_strings.dart';
 
 class AppController extends ChangeNotifier {
@@ -40,6 +46,8 @@ class AppController extends ChangeNotifier {
   final groupNameController = TextEditingController();
   final groupInviteEmailController = TextEditingController();
   final groupInviteCodeController = TextEditingController();
+  final albumNameController = TextEditingController();
+  final albumSearchController = TextEditingController();
 
   final ProvisioningService _provisioning;
   final SessionStore _sessionStore;
@@ -57,6 +65,13 @@ class AppController extends ChangeNotifier {
   AccountGroup? selectedGroup;
   List<AccountGroupMember> groupMembers = const [];
   List<AppDevice> groupDevices = const [];
+  List<InkAlbum> albums = const [];
+  List<InkPhoto> photos = const [];
+  List<InkTimelineEvent> timelineEvents = const [];
+  List<InkNotification> notifications = const [];
+  StorageSummary? storageSummary;
+  UserPreferences preferences = const UserPreferences();
+  InkAlbum? selectedAlbum;
   ImageInfo? latestImage;
   Uint8List? previewPng;
   XFile? selectedImage;
@@ -70,12 +85,20 @@ class AppController extends ChangeNotifier {
   bool dither = true;
   bool busy = false;
   String? message;
+  String? uiFeatureError;
+  String timelineRange = 'all';
+
+  static Future<void>? _googleInitialization;
 
   EpaperApiClient get _api => EpaperApiClient(baseUrl: baseUrlController.text);
   AuthService get _auth => AuthService(_api);
   DeviceBindingService get _deviceService => DeviceBindingService(_api);
   GroupService get _groupService => GroupService(_api);
   ImageService get _imageService => ImageService(_api);
+  AlbumService get _albumService => AlbumService(_api);
+  TimelineService get _timelineService => TimelineService(_api);
+  NotificationService get _notificationService => NotificationService(_api);
+  ProfileService get _profileService => ProfileService(_api);
   String? get bearerToken => session?.accessToken;
 
   Future<void> restoreSession(AppStrings s) async {
@@ -98,6 +121,7 @@ class AppController extends ChangeNotifier {
       );
       devices = loadedDevices;
       await _tryRefreshGroupsWithToken(stored.accessToken);
+      await _tryRefreshUiFeaturesWithToken(stored.accessToken);
       selectedDevice = loadedDevices.isEmpty ? null : loadedDevices.first;
       renameController.text = selectedDevice?.nickname ?? '';
     } catch (error) {
@@ -154,9 +178,99 @@ class AppController extends ChangeNotifier {
       session = nextSession;
       devices = loadedDevices;
       await _tryRefreshGroupsWithToken(nextSession.accessToken);
+      await _tryRefreshUiFeaturesWithToken(nextSession.accessToken);
       selectedDevice = loadedDevices.isEmpty ? null : loadedDevices.first;
       renameController.text = selectedDevice?.nickname ?? '';
     });
+  }
+
+  Future<void> loginWithApple(AppStrings s) async {
+    await runAction(s, s.isZh ? 'Apple 登录' : 'Apple sign in', () async {
+      final available = await SignInWithApple.isAvailable();
+      if (!available) {
+        throw ApiError(
+          s.isZh
+              ? '当前设备不支持 Apple 登录。'
+              : 'Apple sign in is not available on this device.',
+        );
+      }
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+      final identityToken = credential.identityToken;
+      if (identityToken == null || identityToken.isEmpty) {
+        throw ApiError(
+          s.isZh ? 'Apple 未返回身份令牌。' : 'Apple did not return an identity token.',
+        );
+      }
+      final fullName = [
+        credential.givenName,
+        credential.familyName,
+      ].whereType<String>().where((part) => part.isNotEmpty).join(' ');
+      await _finishOauthLogin(
+        await _auth.loginWithApple(
+          identityToken: identityToken,
+          authorizationCode: credential.authorizationCode,
+          email: credential.email,
+          fullName: fullName.isEmpty ? null : fullName,
+        ),
+      );
+    });
+  }
+
+  Future<void> loginWithGoogle(AppStrings s) async {
+    await runAction(s, s.isZh ? 'Google 登录' : 'Google sign in', () async {
+      final google = GoogleSignIn.instance;
+      _googleInitialization ??= google.initialize();
+      await _googleInitialization;
+      if (!google.supportsAuthenticate()) {
+        throw ApiError(
+          s.isZh
+              ? '当前平台不支持此 Google 登录方式。'
+              : 'Google sign in is not supported on this platform.',
+        );
+      }
+      final account = await google.authenticate();
+      final identityToken = account.authentication.idToken;
+      if (identityToken == null || identityToken.isEmpty) {
+        throw ApiError(
+          s.isZh
+              ? 'Google 未返回身份令牌。'
+              : 'Google did not return an identity token.',
+        );
+      }
+      final serverAuth = await account.authorizationClient.authorizeServer([
+        'email',
+        'profile',
+      ]);
+      await _finishOauthLogin(
+        await _auth.loginWithGoogle(
+          identityToken: identityToken,
+          authorizationCode: serverAuth?.serverAuthCode,
+          email: account.email,
+          displayName: account.displayName,
+        ),
+      );
+    });
+  }
+
+  Future<void> _finishOauthLogin(AuthSession nextSession) async {
+    final loadedDevices = await _deviceService.listDevices(
+      nextSession.accessToken,
+    );
+    await _sessionStore.save(
+      baseUrl: baseUrlController.text.trim(),
+      accessToken: nextSession.accessToken,
+    );
+    session = nextSession;
+    devices = loadedDevices;
+    await _tryRefreshGroupsWithToken(nextSession.accessToken);
+    await _tryRefreshUiFeaturesWithToken(nextSession.accessToken);
+    selectedDevice = loadedDevices.isEmpty ? null : loadedDevices.first;
+    renameController.text = selectedDevice?.nickname ?? '';
   }
 
   Future<void> logout(AppStrings s) async {
@@ -171,6 +285,13 @@ class AppController extends ChangeNotifier {
       selectedGroup = null;
       groupMembers = const [];
       groupDevices = const [];
+      albums = const [];
+      photos = const [];
+      timelineEvents = const [];
+      notifications = const [];
+      storageSummary = null;
+      selectedAlbum = null;
+      uiFeatureError = null;
     });
   }
 
@@ -189,6 +310,7 @@ class AppController extends ChangeNotifier {
         selectedDevice = loadedDevices.first;
         renameController.text = selectedDevice?.nickname ?? '';
       }
+      await _tryRefreshUiFeaturesWithToken(token);
     });
   }
 
@@ -596,6 +718,23 @@ class AppController extends ChangeNotifier {
       );
       final loadedDevices = await _deviceService.listDevices(token);
       latestImage = image;
+      photos = [
+        InkPhoto.fromImageInfo(image, deviceId: device.deviceId),
+        ...photos,
+      ];
+      timelineEvents = [
+        InkTimelineEvent(
+          eventId: 'local-${image.imageId}',
+          type: 'photo_assigned',
+          title: s.isZh ? '照片已下发' : 'Photo sent',
+          subtitle: _deviceTitle(device),
+          photoId: image.imageId,
+          deviceId: device.deviceId,
+          previewUrl: image.previewUrl,
+          createdAt: image.createdAt,
+        ),
+        ...timelineEvents,
+      ];
       previewPng = preview;
       devices = loadedDevices;
       selectedDevice = loadedDevices.firstWhere(
@@ -603,6 +742,153 @@ class AppController extends ChangeNotifier {
         orElse: () => device,
       );
     });
+  }
+
+  Future<void> refreshUiFeatures(AppStrings s) async {
+    final token = requireLogin(s);
+    await runAction(s, s.isZh ? '刷新内容' : 'Refresh content', () async {
+      await _refreshUiFeaturesWithToken(token);
+    });
+  }
+
+  Future<void> createAlbum(AppStrings s) async {
+    final token = requireLogin(s);
+    await runAction(s, s.isZh ? '创建相册' : 'Create album', () async {
+      final title = albumNameController.text.trim();
+      if (title.isEmpty) {
+        throw ApiError(s.isZh ? '请输入相册名称。' : 'Enter an album name.');
+      }
+      final album = await _albumService.createAlbum(
+        bearerToken: token,
+        title: title,
+      );
+      albumNameController.clear();
+      await _refreshAlbumsWithToken(token, preferredAlbumId: album.albumId);
+    });
+  }
+
+  Future<void> renameSelectedAlbum(AppStrings s) async {
+    final token = requireLogin(s);
+    final album = selectedAlbum;
+    if (album == null) {
+      throw ApiError(s.isZh ? '请先选择相册。' : 'Select an album first.');
+    }
+    await runAction(s, s.isZh ? '重命名相册' : 'Rename album', () async {
+      final title = albumNameController.text.trim();
+      if (title.isEmpty) {
+        throw ApiError(s.isZh ? '请输入相册名称。' : 'Enter an album name.');
+      }
+      final updated = await _albumService.updateAlbum(
+        bearerToken: token,
+        albumId: album.albumId,
+        title: title,
+        subtitle: album.subtitle,
+      );
+      selectedAlbum = updated;
+      await _refreshAlbumsWithToken(token, preferredAlbumId: updated.albumId);
+    });
+  }
+
+  Future<void> deleteSelectedAlbum(AppStrings s) async {
+    final token = requireLogin(s);
+    final album = selectedAlbum;
+    if (album == null) {
+      throw ApiError(s.isZh ? '请先选择相册。' : 'Select an album first.');
+    }
+    await runAction(s, s.isZh ? '删除相册' : 'Delete album', () async {
+      await _albumService.deleteAlbum(
+        bearerToken: token,
+        albumId: album.albumId,
+      );
+      await _refreshAlbumsWithToken(token);
+    });
+  }
+
+  Future<void> toggleFavoritePhoto(AppStrings s, InkPhoto photo) async {
+    final token = requireLogin(s);
+    await runAction(s, s.isZh ? '更新收藏' : 'Update favorite', () async {
+      final updated = await _albumService.updatePhoto(
+        bearerToken: token,
+        photoId: photo.photoId,
+        favorite: !photo.favorite,
+      );
+      photos = [
+        for (final item in photos)
+          item.photoId == updated.photoId ? updated : item,
+      ];
+    });
+  }
+
+  Future<void> addLatestPhotoToSelectedAlbum(AppStrings s) async {
+    final token = requireLogin(s);
+    final album = selectedAlbum;
+    final image = latestImage;
+    if (album == null) {
+      throw ApiError(s.isZh ? '请先选择相册。' : 'Select an album first.');
+    }
+    if (image == null) {
+      throw ApiError(s.isZh ? '请先上传照片。' : 'Upload a photo first.');
+    }
+    await runAction(s, s.isZh ? '加入相册' : 'Add to album', () async {
+      await _albumService.addPhotoToAlbum(
+        bearerToken: token,
+        albumId: album.albumId,
+        photoId: image.imageId,
+      );
+      await _refreshAlbumsWithToken(token, preferredAlbumId: album.albumId);
+      photos = await _albumService.listPhotos(token);
+    });
+  }
+
+  Future<void> markNotificationRead(AppStrings s, InkNotification item) async {
+    final token = requireLogin(s);
+    await runAction(s, s.isZh ? '读取通知' : 'Read notification', () async {
+      await _notificationService.markRead(
+        bearerToken: token,
+        notificationId: item.notificationId,
+      );
+      notifications = await _notificationService.listNotifications(token);
+    });
+  }
+
+  Future<void> updatePreferences(AppStrings s, UserPreferences next) async {
+    final token = requireLogin(s);
+    await runAction(s, s.isZh ? '更新设置' : 'Update settings', () async {
+      preferences = await _profileService.updatePreferences(
+        bearerToken: token,
+        preferences: next,
+      );
+    });
+  }
+
+  List<InkAlbum> get filteredAlbums {
+    final query = albumSearchController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      return albums;
+    }
+    return albums
+        .where(
+          (album) =>
+              album.title.toLowerCase().contains(query) ||
+              album.tags.any((tag) => tag.toLowerCase().contains(query)),
+        )
+        .toList(growable: false);
+  }
+
+  void setAlbumSearch(String value) {
+    albumSearchController.text = value;
+    notifyListeners();
+  }
+
+  void selectAlbum(InkAlbum album) {
+    selectedAlbum = album;
+    albumNameController.text = album.title;
+    notifyListeners();
+  }
+
+  void setTimelineRange(String value) {
+    timelineRange = value;
+    notifyListeners();
   }
 
   void selectDevice(AppDevice device) {
@@ -735,6 +1021,59 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  Future<void> _tryRefreshUiFeaturesWithToken(String token) async {
+    try {
+      await _refreshUiFeaturesWithToken(token);
+      uiFeatureError = null;
+    } catch (error) {
+      uiFeatureError = '$error';
+      albums = const [];
+      photos = const [];
+      timelineEvents = const [];
+      notifications = const [];
+      storageSummary = null;
+    }
+  }
+
+  Future<void> _refreshUiFeaturesWithToken(String token) async {
+    await _refreshAlbumsWithToken(token);
+    final results = await Future.wait<Object>([
+      _albumService.listPhotos(token),
+      _timelineService.listTimeline(
+        bearerToken: token,
+        range: timelineRange,
+        albumId: selectedAlbum?.albumId,
+        deviceId: selectedDevice?.deviceId,
+      ),
+      _notificationService.listNotifications(token),
+      _profileService.getStorage(token),
+      _profileService.getPreferences(token),
+    ]);
+    photos = results[0] as List<InkPhoto>;
+    timelineEvents = results[1] as List<InkTimelineEvent>;
+    notifications = results[2] as List<InkNotification>;
+    storageSummary = results[3] as StorageSummary;
+    preferences = results[4] as UserPreferences;
+  }
+
+  Future<void> _refreshAlbumsWithToken(
+    String token, {
+    String? preferredAlbumId,
+  }) async {
+    final loadedAlbums = await _albumService.listAlbums(token);
+    albums = loadedAlbums;
+    if (loadedAlbums.isEmpty) {
+      selectedAlbum = null;
+      return;
+    }
+    final preferred = preferredAlbumId ?? selectedAlbum?.albumId;
+    selectedAlbum = loadedAlbums.firstWhere(
+      (album) => album.albumId == preferred,
+      orElse: () => loadedAlbums.first,
+    );
+    albumNameController.text = selectedAlbum?.title ?? '';
+  }
+
   Future<void> _refreshGroupDetailWithToken(
     String token,
     String groupId,
@@ -814,8 +1153,16 @@ class AppController extends ChangeNotifier {
     groupNameController.dispose();
     groupInviteEmailController.dispose();
     groupInviteCodeController.dispose();
+    albumNameController.dispose();
+    albumSearchController.dispose();
     super.dispose();
   }
+}
+
+String _deviceTitle(AppDevice device) {
+  return device.nickname?.isNotEmpty == true
+      ? device.nickname!
+      : device.deviceId;
 }
 
 class _UploadFile {

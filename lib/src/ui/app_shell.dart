@@ -78,7 +78,10 @@ class _AppShellState extends State<AppShell> {
           );
         }
         final pages = [
-          _HomePage(controller: _controller),
+          _HomePage(
+            controller: _controller,
+            onOpenAlbums: () => setState(() => _index = 1),
+          ),
           _AlbumsPage(controller: _controller),
           _TimelinePage(controller: _controller),
           _SendPage(controller: _controller),
@@ -262,7 +265,7 @@ class _AuthPageState extends State<_AuthPage> {
                           children: [
                             Expanded(
                               child: InkButton.secondary(
-                                onPressed: () {},
+                                onPressed: () => controller.loginWithApple(s),
                                 icon: Icons.apple,
                                 label: 'Apple',
                               ),
@@ -270,7 +273,7 @@ class _AuthPageState extends State<_AuthPage> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: InkButton.secondary(
-                                onPressed: () {},
+                                onPressed: () => controller.loginWithGoogle(s),
                                 icon: Icons.g_mobiledata,
                                 label: 'Google',
                               ),
@@ -396,9 +399,10 @@ class _AuthPageState extends State<_AuthPage> {
 }
 
 class _HomePage extends StatelessWidget {
-  const _HomePage({required this.controller});
+  const _HomePage({required this.controller, required this.onOpenAlbums});
 
   final AppController controller;
+  final VoidCallback onOpenAlbums;
 
   @override
   Widget build(BuildContext context) {
@@ -416,19 +420,38 @@ class _HomePage extends StatelessWidget {
         _Panel(
           title: s.isZh ? '我的相册' : 'My Albums',
           action: TextButton(
-            onPressed: () {},
+            onPressed: onOpenAlbums,
             child: Text(s.isZh ? '查看全部' : 'View all'),
           ),
-          child: SizedBox(
-            height: 152,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemBuilder: (context, index) =>
-                  _AlbumCoverCard(album: _demoAlbums[index], compact: true),
-              separatorBuilder: (_, _) => const SizedBox(width: 10),
-              itemCount: _demoAlbums.length,
-            ),
-          ),
+          child: controller.albums.isEmpty
+              ? _FeatureEmptyState(
+                  icon: Icons.photo_library_outlined,
+                  title: s.isZh ? '等待云端相册' : 'Waiting for cloud albums',
+                  detail: controller.uiFeatureError,
+                )
+              : SizedBox(
+                  height: 152,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemBuilder: (context, index) => _InkAlbumCard(
+                      album: controller.albums[index],
+                      compact: true,
+                      onTap: () {
+                        controller.selectAlbum(controller.albums[index]);
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => _AlbumDetailPage(
+                              controller: controller,
+                              album: controller.albums[index],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    separatorBuilder: (_, _) => const SizedBox(width: 10),
+                    itemCount: controller.albums.length,
+                  ),
+                ),
         ),
         _Panel(
           title: s.familySharing,
@@ -443,20 +466,22 @@ class _HomePage extends StatelessWidget {
             ),
             child: Text(s.manageSharing),
           ),
-          child: _MemberAvatarRow(),
+          child: _MemberAvatarRow(controller: controller),
         ),
         _DeviceSyncCard(controller: controller),
         _Panel(
           title: s.isZh ? '最近更新' : 'Recent Updates',
           child: Column(
             children: [
-              for (final item in _demoUpdates)
-                _UpdateTile(
-                  title: item.titleZh,
-                  subtitle: item.subtitleZh,
-                  image: item.asset,
-                  dotColor: item.color,
-                ),
+              if (controller.timelineEvents.isEmpty)
+                _FeatureEmptyState(
+                  icon: Icons.update_outlined,
+                  title: s.isZh ? '暂无云端更新' : 'No cloud updates yet',
+                  detail: controller.uiFeatureError,
+                )
+              else
+                for (final item in controller.timelineEvents.take(3))
+                  _UpdateTile.fromTimeline(item: item),
             ],
           ),
         ),
@@ -473,6 +498,7 @@ class _AlbumsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = AppStrings.of(context);
+    final albums = controller.filteredAlbums;
     return _PageScaffold(
       children: [
         _HeaderBlock(
@@ -482,34 +508,100 @@ class _AlbumsPage extends StatelessWidget {
               ? '浏览、筛选和珍藏每一段回忆。'
               : 'Browse, filter, and keep every memory.',
         ),
-        _FilterChips(
-          labels: [
-            s.isZh ? '全部' : 'All',
-            s.isZh ? '旅行' : 'Travel',
-            s.isZh ? '家人' : 'Family',
-            s.isZh ? '成长' : 'Growth',
-            s.isZh ? '节日' : 'Holiday',
-          ],
-        ),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: 0.82,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+        _Panel(
+          title: s.isZh ? '相册管理' : 'Album management',
+          action: IconButton(
+            onPressed: () => controller.refreshUiFeatures(s),
+            icon: const Icon(Icons.refresh),
           ),
-          itemCount: _demoAlbums.length,
-          itemBuilder: (context, index) => _AlbumCoverCard(
-            album: _demoAlbums[index],
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => _AlbumDetailPage(album: _demoAlbums[index]),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InkTextField(
+                controller: controller.albumSearchController,
+                labelText: s.isZh ? '搜索相册' : 'Search albums',
+                prefixIcon: Icons.search,
               ),
+              const SizedBox(height: 10),
+              InkTextField(
+                controller: controller.albumNameController,
+                labelText: s.isZh ? '相册名称' : 'Album name',
+                prefixIcon: Icons.photo_album_outlined,
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilledButton.icon(
+                    onPressed: () => controller.createAlbum(s),
+                    icon: const Icon(Icons.add),
+                    label: Text(s.isZh ? '创建相册' : 'Create album'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: controller.selectedAlbum == null
+                        ? null
+                        : () => controller.renameSelectedAlbum(s),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: Text(s.rename),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: controller.selectedAlbum == null
+                        ? null
+                        : () => controller.deleteSelectedAlbum(s),
+                    icon: const Icon(Icons.delete_outline),
+                    label: Text(s.isZh ? '删除' : 'Delete'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        if (albums.isEmpty)
+          _Panel(
+            title: s.albums,
+            child: _FeatureEmptyState(
+              icon: Icons.photo_library_outlined,
+              title: s.isZh ? '还没有云端相册' : 'No cloud albums yet',
+              detail: controller.uiFeatureError,
+            ),
+          )
+        else
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.82,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            itemCount: albums.length,
+            itemBuilder: (context, index) => _InkAlbumCard(
+              album: albums[index],
+              selected:
+                  albums[index].albumId == controller.selectedAlbum?.albumId,
+              onTap: () {
+                controller.selectAlbum(albums[index]);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => _AlbumDetailPage(
+                      controller: controller,
+                      album: albums[index],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
-        ),
+        if (controller.photos.isNotEmpty)
+          _Panel(
+            title: s.isZh ? '照片库' : 'Photo library',
+            child: _PhotoGrid(
+              photos: controller.photos,
+              onFavorite: (photo) => controller.toggleFavoritePhoto(s, photo),
+            ),
+          ),
       ],
     );
   }
@@ -532,22 +624,43 @@ class _TimelinePage extends StatelessWidget {
               ? '按月份整理生活流动的瞬间。'
               : 'Moments arranged by month and feeling.',
         ),
-        _FilterChips(labels: const ['2024', '3月', '4月', '5月', '6月']),
-        for (final group in _demoTimeline)
-          _Panel(
-            title: group.title,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  group.subtitle,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 10),
-                _PhotoStrip(assets: group.assets),
-              ],
-            ),
+        _Panel(
+          title: s.isZh ? '时间筛选' : 'Timeline filters',
+          action: IconButton(
+            onPressed: () => controller.refreshUiFeatures(s),
+            icon: const Icon(Icons.refresh),
           ),
+          child: SegmentedButton<String>(
+            segments: [
+              ButtonSegment(value: 'all', label: Text(s.isZh ? '全部' : 'All')),
+              ButtonSegment(
+                value: 'month',
+                label: Text(s.isZh ? '本月' : 'Month'),
+              ),
+              ButtonSegment(value: 'year', label: Text(s.isZh ? '今年' : 'Year')),
+            ],
+            selected: {controller.timelineRange},
+            onSelectionChanged: (values) {
+              controller.setTimelineRange(values.first);
+              controller.refreshUiFeatures(s);
+            },
+          ),
+        ),
+        if (controller.timelineEvents.isEmpty)
+          _Panel(
+            title: s.timeline,
+            child: _FeatureEmptyState(
+              icon: Icons.schedule_outlined,
+              title: s.isZh ? '暂无时间线事件' : 'No timeline events yet',
+              detail: controller.uiFeatureError,
+            ),
+          )
+        else
+          for (final event in controller.timelineEvents)
+            _Panel(
+              title: event.createdAt ?? event.type,
+              child: _TimelineEventTile(event: event),
+            ),
       ],
     );
   }
@@ -665,6 +778,52 @@ class _SendPage extends StatelessWidget {
         ),
         if (controller.latestImage != null)
           _ImageMetaPanel(image: controller.latestImage!),
+        if (controller.latestImage != null)
+          _Panel(
+            title: s.isZh ? '加入相册' : 'Add to album',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (controller.albums.isEmpty)
+                  _FeatureEmptyState(
+                    icon: Icons.photo_album_outlined,
+                    title: s.isZh ? '暂无相册可选' : 'No albums available',
+                    detail: controller.uiFeatureError,
+                  )
+                else
+                  DropdownButtonFormField<String>(
+                    initialValue: controller.selectedAlbum?.albumId,
+                    items: [
+                      for (final album in controller.albums)
+                        DropdownMenuItem(
+                          value: album.albumId,
+                          child: Text(
+                            album.title,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      controller.selectAlbum(
+                        controller.albums.firstWhere(
+                          (album) => album.albumId == value,
+                        ),
+                      );
+                    },
+                    decoration: InputDecoration(labelText: s.albums),
+                  ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: controller.albums.isEmpty
+                      ? null
+                      : () => controller.addLatestPhotoToSelectedAlbum(s),
+                  icon: const Icon(Icons.library_add_outlined),
+                  label: Text(s.isZh ? '加入相册' : 'Add to album'),
+                ),
+              ],
+            ),
+          ),
         _SendProgressPanel(controller: controller),
       ],
     );
@@ -1347,6 +1506,239 @@ class _PasswordResetPage extends StatelessWidget {
                   label: Text(s.resetPassword),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NotificationsPage extends StatelessWidget {
+  const _NotificationsPage({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    return Scaffold(
+      appBar: AppBar(title: Text(s.isZh ? '通知' : 'Notifications')),
+      body: _PageScaffold(
+        children: [
+          _Panel(
+            title: s.isZh ? '云端通知' : 'Cloud notifications',
+            action: IconButton(
+              onPressed: () => controller.refreshUiFeatures(s),
+              icon: const Icon(Icons.refresh),
+            ),
+            child: controller.notifications.isEmpty
+                ? _FeatureEmptyState(
+                    icon: Icons.notifications_none,
+                    title: s.isZh ? '暂无通知' : 'No notifications yet',
+                    detail: controller.uiFeatureError,
+                  )
+                : Column(
+                    children: [
+                      for (final item in controller.notifications)
+                        InkIconTile(
+                          icon: item.read
+                              ? Icons.notifications_none
+                              : Icons.notifications_active_outlined,
+                          title: item.title,
+                          subtitle: [
+                            if (item.body != null) item.body!,
+                            if (item.createdAt != null) item.createdAt!,
+                          ].join(' · '),
+                          dotColor: item.read ? null : InkTheme.eInkRed,
+                          onTap: () => controller.markNotificationRead(s, item),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StoragePage extends StatelessWidget {
+  const _StoragePage({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    final storage = controller.storageSummary;
+    return Scaffold(
+      appBar: AppBar(title: Text(s.isZh ? '存储与空间' : 'Storage')),
+      body: _PageScaffold(
+        children: [
+          _Panel(
+            title: s.isZh ? '云端空间' : 'Cloud storage',
+            action: IconButton(
+              onPressed: () => controller.refreshUiFeatures(s),
+              icon: const Icon(Icons.refresh),
+            ),
+            child: storage == null
+                ? _FeatureEmptyState(
+                    icon: Icons.cloud_queue_outlined,
+                    title: s.isZh ? '暂无存储统计' : 'No storage summary yet',
+                    detail: controller.uiFeatureError,
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      LinearProgressIndicator(
+                        value: storage.usedRatio.clamp(0, 1).toDouble(),
+                      ),
+                      const SizedBox(height: 12),
+                      _KeyValue(
+                        label: s.isZh ? '已使用' : 'Used',
+                        value: _storageLabel(storage),
+                      ),
+                      _KeyValue(
+                        label: s.isZh ? '照片' : 'Photos',
+                        value: '${storage.photoCount}',
+                      ),
+                      _KeyValue(
+                        label: s.albums,
+                        value: '${storage.albumCount}',
+                      ),
+                      _KeyValue(
+                        label: s.devices,
+                        value: '${storage.deviceCount}',
+                      ),
+                      if (storage.cleanupSuggestion != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(storage.cleanupSuggestion!),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreferencesPage extends StatelessWidget {
+  const _PreferencesPage({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    final prefs = controller.preferences;
+    return Scaffold(
+      appBar: AppBar(title: Text(s.isZh ? '隐私与偏好' : 'Privacy & preferences')),
+      body: _PageScaffold(
+        children: [
+          _Panel(
+            title: s.isZh ? '通知与可见性' : 'Alerts and visibility',
+            child: Column(
+              children: [
+                SwitchListTile(
+                  value: prefs.deviceAlerts,
+                  onChanged: (value) => controller.updatePreferences(
+                    s,
+                    UserPreferences(
+                      deviceAlerts: value,
+                      sharingAlerts: prefs.sharingAlerts,
+                      uploadAlerts: prefs.uploadAlerts,
+                      profileVisibility: prefs.profileVisibility,
+                      analyticsEnabled: prefs.analyticsEnabled,
+                    ),
+                  ),
+                  title: Text(s.isZh ? '设备提醒' : 'Device alerts'),
+                ),
+                SwitchListTile(
+                  value: prefs.sharingAlerts,
+                  onChanged: (value) => controller.updatePreferences(
+                    s,
+                    UserPreferences(
+                      deviceAlerts: prefs.deviceAlerts,
+                      sharingAlerts: value,
+                      uploadAlerts: prefs.uploadAlerts,
+                      profileVisibility: prefs.profileVisibility,
+                      analyticsEnabled: prefs.analyticsEnabled,
+                    ),
+                  ),
+                  title: Text(s.isZh ? '共享提醒' : 'Sharing alerts'),
+                ),
+                SwitchListTile(
+                  value: prefs.uploadAlerts,
+                  onChanged: (value) => controller.updatePreferences(
+                    s,
+                    UserPreferences(
+                      deviceAlerts: prefs.deviceAlerts,
+                      sharingAlerts: prefs.sharingAlerts,
+                      uploadAlerts: value,
+                      profileVisibility: prefs.profileVisibility,
+                      analyticsEnabled: prefs.analyticsEnabled,
+                    ),
+                  ),
+                  title: Text(s.isZh ? '上传提醒' : 'Upload alerts'),
+                ),
+                SwitchListTile(
+                  value: prefs.analyticsEnabled,
+                  onChanged: (value) => controller.updatePreferences(
+                    s,
+                    UserPreferences(
+                      deviceAlerts: prefs.deviceAlerts,
+                      sharingAlerts: prefs.sharingAlerts,
+                      uploadAlerts: prefs.uploadAlerts,
+                      profileVisibility: prefs.profileVisibility,
+                      analyticsEnabled: value,
+                    ),
+                  ),
+                  title: Text(s.isZh ? '体验分析' : 'Experience analytics'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _InfoPageKind { help, about }
+
+class _InfoPage extends StatelessWidget {
+  const _InfoPage({required this.kind});
+
+  final _InfoPageKind kind;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    final about = kind == _InfoPageKind.about;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          about
+              ? (s.isZh ? '关于 InkSplash' : 'About InkSplash')
+              : (s.isZh ? '帮助与反馈' : 'Help & feedback'),
+        ),
+      ),
+      body: _PageScaffold(
+        children: [
+          _Panel(
+            title: about
+                ? (s.isZh ? 'InkSplash' : 'InkSplash')
+                : (s.isZh ? '支持' : 'Support'),
+            child: Text(
+              about
+                  ? (s.isZh
+                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.13。'
+                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.13.')
+                  : (s.isZh
+                        ? '如需反馈，请在 GitHub 项目中提交 issue，并附上设备型号、系统版本和问题截图。'
+                        : 'For feedback, open a GitHub issue with your device model, OS version, and screenshots.'),
             ),
           ),
         ],
@@ -2238,88 +2630,65 @@ class _HeaderBlock extends StatelessWidget {
   }
 }
 
-class _AlbumCoverCard extends StatelessWidget {
-  const _AlbumCoverCard({
-    required this.album,
-    this.compact = false,
-    this.onTap,
-  });
-
-  final _DemoAlbum album;
-  final bool compact;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: compact ? 118 : null,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Image.asset(
-                  album.asset,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                ),
-              ),
-            ),
-            const SizedBox(height: 9),
-            Text(
-              album.titleZh,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            Text(
-              '${album.count} 张照片',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _MemberAvatarRow extends StatelessWidget {
+  const _MemberAvatarRow({required this.controller});
+
+  final AppController controller;
+
   @override
   Widget build(BuildContext context) {
-    final members = [
-      ['Emily', '你', 'assets/demo/avatar_emily.png'],
-      ['爸爸', '在线', 'assets/demo/avatar_dad.png'],
-      ['妈妈', '在线', 'assets/demo/avatar_mom.png'],
-      ['奶奶', '离线', 'assets/demo/avatar_grandma.png'],
+    final s = AppStrings.of(context);
+    final members = controller.groupMembers.isEmpty
+        ? [
+            [controller.session?.user.email ?? 'Me', s.isZh ? '你' : 'You'],
+          ]
+        : [
+            for (final member in controller.groupMembers)
+              [member.email, member.role],
+          ];
+    final avatars = [
+      'assets/demo/avatar_emily.png',
+      'assets/demo/avatar_dad.png',
+      'assets/demo/avatar_mom.png',
+      'assets/demo/avatar_grandma.png',
     ];
     return Row(
       children: [
-        for (final member in members)
+        for (var index = 0; index < members.length.clamp(0, 4); index++)
           Expanded(
             child: Column(
               children: [
                 CircleAvatar(
-                  backgroundImage: AssetImage(member[2]),
+                  backgroundImage: AssetImage(avatars[index % avatars.length]),
                   radius: 24,
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  member[0],
+                  members[index][0],
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                Text(member[1], style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  members[index][1],
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ],
             ),
           ),
-        OutlinedButton(onPressed: () {}, child: const Icon(Icons.add)),
+        OutlinedButton(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => _BusyRoute(
+                controller: controller,
+                child: _SharingPage(controller: controller),
+              ),
+            ),
+          ),
+          child: const Icon(Icons.add),
+        ),
       ],
     );
   }
@@ -2342,9 +2711,11 @@ class _DeviceSyncCard extends StatelessWidget {
       ),
       child: InkIconTile(
         icon: Icons.tablet_mac_outlined,
-        title: device == null ? 'InkPad Color 6' : _deviceTitle(device),
+        title: device == null
+            ? (s.isZh ? '尚未选择设备' : 'No device selected')
+            : _deviceTitle(device),
         subtitle: device == null
-            ? '已连接 · 电量 78%'
+            ? s.bindFirstThenRefresh
             : '${device.lastStatus ?? 'online'} · v${device.currentVersion ?? 0}',
         dotColor: InkTheme.eInkBlue,
         trailing: ClipRRect(
@@ -2366,16 +2737,21 @@ class _DeviceSyncCard extends StatelessWidget {
 }
 
 class _UpdateTile extends StatelessWidget {
-  const _UpdateTile({
-    required this.title,
-    required this.subtitle,
-    required this.image,
-    required this.dotColor,
-  });
+  _UpdateTile.fromTimeline({required InkTimelineEvent item})
+    : title = item.title,
+      subtitle = [
+        if (item.subtitle != null) item.subtitle!,
+        if (item.deviceId != null) item.deviceId!,
+        if (item.createdAt != null) item.createdAt!,
+      ].join(' · '),
+      image = null,
+      previewUrl = item.previewUrl,
+      dotColor = _timelineColor(item.type);
 
   final String title;
   final String subtitle;
-  final String image;
+  final String? image;
+  final String? previewUrl;
   final Color dotColor;
 
   @override
@@ -2387,10 +2763,23 @@ class _UpdateTile extends StatelessWidget {
       dotColor: dotColor,
       trailing: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image.asset(image, width: 50, height: 50, fit: BoxFit.cover),
+        child: _RemoteOrAssetThumb(
+          url: previewUrl,
+          asset: image ?? 'assets/demo/frame_preview.png',
+          width: 50,
+          height: 50,
+        ),
       ),
     );
   }
+}
+
+Color _timelineColor(String type) {
+  return switch (type) {
+    'photo_assigned' || 'device_displayed' => InkTheme.eInkBlue,
+    'group_invite' || 'member_joined' => InkTheme.eInkRed,
+    _ => InkTheme.eInkYellow,
+  };
 }
 
 class _FilterChips extends StatelessWidget {
@@ -2424,26 +2813,114 @@ class _FilterChips extends StatelessWidget {
   }
 }
 
-class _PhotoStrip extends StatelessWidget {
-  const _PhotoStrip({required this.assets});
+class _FeatureEmptyState extends StatelessWidget {
+  const _FeatureEmptyState({
+    required this.icon,
+    required this.title,
+    this.detail,
+  });
 
-  final List<String> assets;
+  final IconData icon;
+  final String title;
+  final String? detail;
+
+  @override
+  Widget build(BuildContext context) {
+    return _EmptyState(
+      icon: icon,
+      text: [
+        title,
+        if (detail != null && detail!.isNotEmpty) detail!,
+      ].join('\n'),
+    );
+  }
+}
+
+class _RemoteOrAssetThumb extends StatelessWidget {
+  const _RemoteOrAssetThumb({
+    required this.asset,
+    this.url,
+    this.width,
+    this.height,
+  });
+
+  final String? url;
+  final String asset;
+  final double? width;
+  final double? height;
+
+  @override
+  Widget build(BuildContext context) {
+    final remote = url;
+    if (remote != null && remote.isNotEmpty) {
+      return Image.network(
+        remote,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) =>
+            Image.asset(asset, width: width, height: height, fit: BoxFit.cover),
+      );
+    }
+    return Image.asset(asset, width: width, height: height, fit: BoxFit.cover);
+  }
+}
+
+class _InkAlbumCard extends StatelessWidget {
+  const _InkAlbumCard({
+    required this.album,
+    this.compact = false,
+    this.selected = false,
+    this.onTap,
+  });
+
+  final InkAlbum album;
+  final bool compact;
+  final bool selected;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 118,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: assets.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, index) => ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: Image.asset(
-            assets[index],
-            width: 112,
-            height: 112,
-            fit: BoxFit.cover,
+      width: compact ? 118 : null,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: selected
+                ? Border.all(color: InkTheme.eInkBlue, width: 1.4)
+                : null,
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(selected ? 4 : 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: _RemoteOrAssetThumb(
+                      url: album.coverUrl,
+                      asset: 'assets/demo/album_cover.png',
+                      width: double.infinity,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 9),
+                Text(
+                  album.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  '${album.photoCount} ${AppStrings.of(context).isZh ? '张照片' : 'photos'}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2451,35 +2928,126 @@ class _PhotoStrip extends StatelessWidget {
   }
 }
 
-class _AlbumDetailPage extends StatelessWidget {
-  const _AlbumDetailPage({required this.album});
+class _PhotoGrid extends StatelessWidget {
+  const _PhotoGrid({required this.photos, required this.onFavorite});
 
-  final _DemoAlbum album;
+  final List<InkPhoto> photos;
+  final ValueChanged<InkPhoto> onFavorite;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 7,
+        crossAxisSpacing: 7,
+      ),
+      itemCount: photos.length,
+      itemBuilder: (context, index) {
+        final photo = photos[index];
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: _RemoteOrAssetThumb(
+                url: photo.previewUrl,
+                asset: 'assets/demo/frame_preview.png',
+              ),
+            ),
+            Positioned(
+              right: 2,
+              top: 2,
+              child: IconButton.filledTonal(
+                onPressed: () => onFavorite(photo),
+                icon: Icon(
+                  photo.favorite ? Icons.favorite : Icons.favorite_border,
+                  size: 18,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _TimelineEventTile extends StatelessWidget {
+  const _TimelineEventTile({required this.event});
+
+  final InkTimelineEvent event;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkIconTile(
+      icon: switch (event.type) {
+        'photo_assigned' => Icons.send_outlined,
+        'device_displayed' => Icons.tablet_mac_outlined,
+        'group_invite' => Icons.group_add_outlined,
+        'member_joined' => Icons.person_add_alt_1,
+        _ => Icons.image_outlined,
+      },
+      title: event.title,
+      subtitle: [
+        if (event.subtitle != null) event.subtitle!,
+        if (event.deviceId != null) event.deviceId!,
+        if (event.albumId != null) event.albumId!,
+      ].join(' · '),
+      dotColor: _timelineColor(event.type),
+      trailing: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: _RemoteOrAssetThumb(
+          url: event.previewUrl,
+          asset: 'assets/demo/frame_preview.png',
+          width: 50,
+          height: 50,
+        ),
+      ),
+    );
+  }
+}
+
+class _AlbumDetailPage extends StatelessWidget {
+  const _AlbumDetailPage({required this.controller, required this.album});
+
+  final AppController controller;
+  final InkAlbum album;
 
   @override
   Widget build(BuildContext context) {
     final s = AppStrings.of(context);
+    final photos = album.photos.isEmpty
+        ? controller.photos
+              .where((photo) => photo.albumIds.contains(album.albumId))
+              .toList(growable: false)
+        : album.photos;
     return Scaffold(
-      appBar: AppBar(title: Text(album.titleZh)),
+      appBar: AppBar(title: Text(album.title)),
       body: _PageScaffold(
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(24),
-            child: Image.asset(
-              album.asset,
+            child: _RemoteOrAssetThumb(
+              url: album.coverUrl,
+              asset: 'assets/demo/album_cover.png',
               height: 220,
               width: double.infinity,
-              fit: BoxFit.cover,
             ),
           ),
           Text(
-            album.titleZh,
+            album.title,
             style: Theme.of(
               context,
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
           ),
-          Text('${album.count} 张照片 · 6 个地点'),
-          _MemberAvatarRow(),
+          Text(
+            '${album.photoCount} ${s.isZh ? '张照片' : 'photos'}'
+            '${album.shared ? ' · ${s.familySharing}' : ''}',
+          ),
+          _MemberAvatarRow(controller: controller),
           _FilterChips(
             labels: [
               s.isZh ? '照片' : 'Photos',
@@ -2487,20 +3055,16 @@ class _AlbumDetailPage extends StatelessWidget {
               s.isZh ? '地点' : 'Places',
             ],
           ),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              mainAxisSpacing: 7,
-              crossAxisSpacing: 7,
+          if (photos.isEmpty)
+            _FeatureEmptyState(
+              icon: Icons.image_outlined,
+              title: s.isZh ? '这个相册还没有照片' : 'No photos in this album yet',
+            )
+          else
+            _PhotoGrid(
+              photos: photos,
+              onFavorite: (photo) => controller.toggleFavoritePhoto(s, photo),
             ),
-            itemCount: _demoPhotos.length,
-            itemBuilder: (context, index) => ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: Image.asset(_demoPhotos[index], fit: BoxFit.cover),
-            ),
-          ),
         ],
       ),
     );
@@ -2607,51 +3171,91 @@ class _SettingsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = AppStrings.of(context);
+    final storage = controller.storageSummary;
     final rows = [
-      [
+      _SettingsRow(
         Icons.security_outlined,
         s.isZh ? '账号与安全' : 'Account & security',
         s.isZh ? '修改密码 / 登录状态' : 'Password and sessions',
-        null,
-      ],
-      [
+        () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => _SettingsPage(
+              controller: controller,
+              language: language,
+              onLanguageChanged: onLanguageChanged,
+            ),
+          ),
+        ),
+      ),
+      _SettingsRow(
         Icons.notifications_none,
         s.isZh ? '通知设置' : 'Notifications',
-        s.isZh ? '消息提醒 / 同步通知' : 'Alerts and sync',
-        InkTheme.eInkRed,
-      ],
-      [
+        s.isZh
+            ? '${controller.notifications.where((item) => !item.read).length} 条未读'
+            : '${controller.notifications.where((item) => !item.read).length} unread',
+        () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => _NotificationsPage(controller: controller),
+          ),
+        ),
+        dotColor: InkTheme.eInkRed,
+      ),
+      _SettingsRow(
         Icons.cloud_queue_outlined,
         s.isZh ? '存储与空间' : 'Storage',
-        '2.3 GB / 10 GB',
-        null,
-      ],
-      [
+        storage == null
+            ? (s.isZh ? '等待云端统计' : 'Waiting for cloud usage')
+            : _storageLabel(storage),
+        () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => _StoragePage(controller: controller),
+          ),
+        ),
+      ),
+      _SettingsRow(
         Icons.devices_outlined,
         s.isZh ? '设备管理' : 'Device management',
         s.isZh
             ? '已连接 ${controller.devices.length} 台设备'
             : '${controller.devices.length} devices connected',
-        InkTheme.eInkBlue,
-      ],
-      [
+        () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => _DevicesPage(controller: controller),
+          ),
+        ),
+        dotColor: InkTheme.eInkBlue,
+      ),
+      _SettingsRow(
         Icons.lock_outline,
         s.isZh ? '隐私设置' : 'Privacy',
-        s.isZh ? '权限管理 / 可见性' : 'Permissions and visibility',
-        null,
-      ],
-      [
+        controller.preferences.profileVisibility,
+        () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => _PreferencesPage(controller: controller),
+          ),
+        ),
+      ),
+      _SettingsRow(
         Icons.help_outline,
         s.isZh ? '帮助与反馈' : 'Help & feedback',
         s.isZh ? '常见问题与反馈' : 'FAQ and feedback',
-        null,
-      ],
-      [
+        () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const _InfoPage(kind: _InfoPageKind.help),
+          ),
+        ),
+      ),
+      _SettingsRow(
         Icons.info_outline,
         s.isZh ? '关于 InkSplash' : 'About InkSplash',
-        'v1.0.10',
-        InkTheme.eInkYellow,
-      ],
+        'v1.0.13',
+        () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const _InfoPage(kind: _InfoPageKind.about),
+          ),
+        ),
+        dotColor: InkTheme.eInkYellow,
+      ),
     ];
     return _Panel(
       title: s.settings,
@@ -2678,11 +3282,11 @@ class _SettingsList extends StatelessWidget {
           const SizedBox(height: 12),
           for (final row in rows)
             InkIconTile(
-              icon: row[0] as IconData,
-              title: row[1] as String,
-              subtitle: row[2] as String,
-              dotColor: row[3] as Color?,
-              onTap: () {},
+              icon: row.icon,
+              title: row.title,
+              subtitle: row.subtitle,
+              dotColor: row.dotColor,
+              onTap: row.onTap,
             ),
         ],
       ),
@@ -2690,90 +3294,27 @@ class _SettingsList extends StatelessWidget {
   }
 }
 
-class _DemoAlbum {
-  const _DemoAlbum(this.titleZh, this.asset, this.count);
+class _SettingsRow {
+  const _SettingsRow(
+    this.icon,
+    this.title,
+    this.subtitle,
+    this.onTap, {
+    this.dotColor,
+  });
 
-  final String titleZh;
-  final String asset;
-  final int count;
-}
-
-class _DemoUpdate {
-  const _DemoUpdate(this.titleZh, this.subtitleZh, this.asset, this.color);
-
-  final String titleZh;
-  final String subtitleZh;
-  final String asset;
-  final Color color;
-}
-
-class _TimelineGroup {
-  const _TimelineGroup(this.title, this.subtitle, this.assets);
-
+  final IconData icon;
   final String title;
   final String subtitle;
-  final List<String> assets;
+  final VoidCallback onTap;
+  final Color? dotColor;
 }
 
-const _demoAlbums = [
-  _DemoAlbum('旅行足迹', 'assets/demo/mountain_lake.png', 142),
-  _DemoAlbum('家人时光', 'assets/demo/family_reading.png', 328),
-  _DemoAlbum('成长记忆', 'assets/demo/child_reading.png', 215),
-  _DemoAlbum('节日纪念', 'assets/demo/red_blossom.png', 96),
-  _DemoAlbum('日常点滴', 'assets/demo/daily_scene.png', 176),
-  _DemoAlbum('宠物时光', 'assets/demo/travel_town.png', 64),
-];
-
-const _demoPhotos = [
-  'assets/demo/mountain_lake.png',
-  'assets/demo/red_blossom.png',
-  'assets/demo/child_reading.png',
-  'assets/demo/family_reading.png',
-  'assets/demo/travel_town.png',
-  'assets/demo/daily_scene.png',
-  'assets/demo/frame_preview.png',
-  'assets/demo/album_cover.png',
-  'assets/demo/mountain_lake.png',
-];
-
-const _demoUpdates = [
-  _DemoUpdate(
-    '黄山之旅',
-    '新添加 12 张照片',
-    'assets/demo/mountain_lake.png',
-    Color(0xff2d5bff),
-  ),
-  _DemoUpdate(
-    '全家福 · 春节聚会',
-    '新添加 23 张照片',
-    'assets/demo/family_reading.png',
-    Color(0xffd46a6a),
-  ),
-  _DemoUpdate(
-    '小豆豆的画作',
-    '新添加 8 张照片',
-    'assets/demo/child_reading.png',
-    Color(0xffe5c35a),
-  ),
-];
-
-const _demoTimeline = [
-  _TimelineGroup('5月 · 黄山之旅', '142 张照片', [
-    'assets/demo/mountain_lake.png',
-    'assets/demo/red_blossom.png',
-    'assets/demo/travel_town.png',
-  ]),
-  _TimelineGroup('4月 · 家人时光', '328 张照片', [
-    'assets/demo/family_reading.png',
-    'assets/demo/child_reading.png',
-    'assets/demo/daily_scene.png',
-  ]),
-  _TimelineGroup('3月 · 春日日记', '215 张照片', [
-    'assets/demo/red_blossom.png',
-    'assets/demo/mountain_lake.png',
-    'assets/demo/album_cover.png',
-  ]),
-];
+String _storageLabel(StorageSummary storage) {
+  final usedGb = storage.usedBytes / (1024 * 1024 * 1024);
+  final quotaGb = storage.quotaBytes / (1024 * 1024 * 1024);
+  return '${usedGb.toStringAsFixed(1)} GB / ${quotaGb.toStringAsFixed(0)} GB';
+}
 
 class _ImageMetaPanel extends StatelessWidget {
   const _ImageMetaPanel({required this.image});

@@ -489,6 +489,262 @@ class ImageInfo {
   }
 }
 
+class InkPhoto {
+  const InkPhoto({
+    required this.photoId,
+    required this.imageId,
+    required this.previewUrl,
+    this.title,
+    this.dataUrl,
+    this.albumIds = const [],
+    this.favorite = false,
+    this.tags = const [],
+    this.assignedDeviceId,
+    this.assignedAt,
+    this.width,
+    this.height,
+    this.createdAt,
+  });
+
+  final String photoId;
+  final String imageId;
+  final String? title;
+  final String previewUrl;
+  final String? dataUrl;
+  final List<String> albumIds;
+  final bool favorite;
+  final List<String> tags;
+  final String? assignedDeviceId;
+  final String? assignedAt;
+  final int? width;
+  final int? height;
+  final String? createdAt;
+
+  factory InkPhoto.fromJson(Map<String, dynamic> json) {
+    return InkPhoto(
+      photoId: _string(json['photo_id'] ?? json['id'] ?? json['image_id']),
+      imageId: _string(json['image_id'] ?? json['id']),
+      title: _nullableString(json['title'] ?? json['name']),
+      previewUrl: _string(json['preview_url'] ?? json['thumbnail_url']),
+      dataUrl: _nullableString(json['data_url']),
+      albumIds: _stringList(json['album_ids'] ?? json['albums']),
+      favorite: json['favorite'] == true || json['is_favorite'] == true,
+      tags: _stringList(json['tags']),
+      assignedDeviceId: _nullableString(json['assigned_device_id']),
+      assignedAt: _nullableString(json['assigned_at']),
+      width: _nullableInt(json['width']),
+      height: _nullableInt(json['height']),
+      createdAt: _nullableString(json['created_at']),
+    );
+  }
+
+  factory InkPhoto.fromImageInfo(ImageInfo image, {String? deviceId}) {
+    return InkPhoto(
+      photoId: image.imageId,
+      imageId: image.imageId,
+      title: image.imageId,
+      previewUrl: image.previewUrl,
+      dataUrl: image.dataUrl,
+      assignedDeviceId: deviceId,
+      width: image.width,
+      height: image.height,
+      createdAt: image.createdAt,
+    );
+  }
+}
+
+class InkAlbum {
+  const InkAlbum({
+    required this.albumId,
+    required this.title,
+    this.subtitle,
+    this.coverUrl,
+    this.photoCount = 0,
+    this.tags = const [],
+    this.shared = false,
+    this.photos = const [],
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  final String albumId;
+  final String title;
+  final String? subtitle;
+  final String? coverUrl;
+  final int photoCount;
+  final List<String> tags;
+  final bool shared;
+  final List<InkPhoto> photos;
+  final String? createdAt;
+  final String? updatedAt;
+
+  factory InkAlbum.fromJson(Map<String, dynamic> json) {
+    final rawPhotos = json['photos'];
+    return InkAlbum(
+      albumId: _string(json['album_id'] ?? json['id']),
+      title: _string(json['title'] ?? json['name'], fallback: 'Untitled'),
+      subtitle: _nullableString(json['subtitle'] ?? json['description']),
+      coverUrl: _nullableString(json['cover_url'] ?? json['cover_preview_url']),
+      photoCount: _int(
+        json['photo_count'] ??
+            json['count'] ??
+            (rawPhotos is List ? rawPhotos.length : 0),
+      ),
+      tags: _stringList(json['tags']),
+      shared: json['shared'] == true,
+      photos: rawPhotos is List
+          ? rawPhotos
+                .whereType<Map>()
+                .map(
+                  (item) => InkPhoto.fromJson(
+                    item.map((key, value) => MapEntry('$key', value)),
+                  ),
+                )
+                .toList(growable: false)
+          : const [],
+      createdAt: _nullableString(json['created_at']),
+      updatedAt: _nullableString(json['updated_at']),
+    );
+  }
+}
+
+class InkTimelineEvent {
+  const InkTimelineEvent({
+    required this.eventId,
+    required this.type,
+    required this.title,
+    this.subtitle,
+    this.photoId,
+    this.albumId,
+    this.deviceId,
+    this.previewUrl,
+    this.createdAt,
+  });
+
+  final String eventId;
+  final String type;
+  final String title;
+  final String? subtitle;
+  final String? photoId;
+  final String? albumId;
+  final String? deviceId;
+  final String? previewUrl;
+  final String? createdAt;
+
+  factory InkTimelineEvent.fromJson(Map<String, dynamic> json) {
+    return InkTimelineEvent(
+      eventId: _string(json['event_id'] ?? json['id']),
+      type: _string(json['type'], fallback: 'event'),
+      title: _string(json['title'], fallback: 'InkSplash'),
+      subtitle: _nullableString(json['subtitle'] ?? json['detail']),
+      photoId: _nullableString(json['photo_id']),
+      albumId: _nullableString(json['album_id']),
+      deviceId: _nullableString(json['device_id']),
+      previewUrl: _nullableString(json['preview_url']),
+      createdAt: _nullableString(json['created_at']),
+    );
+  }
+}
+
+class InkNotification {
+  const InkNotification({
+    required this.notificationId,
+    required this.title,
+    this.body,
+    this.type,
+    this.read = false,
+    this.createdAt,
+  });
+
+  final String notificationId;
+  final String title;
+  final String? body;
+  final String? type;
+  final bool read;
+  final String? createdAt;
+
+  factory InkNotification.fromJson(Map<String, dynamic> json) {
+    return InkNotification(
+      notificationId: _string(json['notification_id'] ?? json['id']),
+      title: _string(json['title'], fallback: 'InkSplash'),
+      body: _nullableString(json['body'] ?? json['message']),
+      type: _nullableString(json['type']),
+      read: json['read'] == true || json['read_at'] != null,
+      createdAt: _nullableString(json['created_at']),
+    );
+  }
+}
+
+class StorageSummary {
+  const StorageSummary({
+    required this.usedBytes,
+    required this.quotaBytes,
+    this.photoCount = 0,
+    this.albumCount = 0,
+    this.deviceCount = 0,
+    this.cleanupSuggestion,
+  });
+
+  final int usedBytes;
+  final int quotaBytes;
+  final int photoCount;
+  final int albumCount;
+  final int deviceCount;
+  final String? cleanupSuggestion;
+
+  double get usedRatio => quotaBytes <= 0 ? 0 : usedBytes / quotaBytes;
+
+  factory StorageSummary.fromJson(Map<String, dynamic> json) {
+    return StorageSummary(
+      usedBytes: _int(json['used_bytes']),
+      quotaBytes: _int(json['quota_bytes']),
+      photoCount: _int(json['photo_count']),
+      albumCount: _int(json['album_count']),
+      deviceCount: _int(json['device_count']),
+      cleanupSuggestion: _nullableString(json['cleanup_suggestion']),
+    );
+  }
+}
+
+class UserPreferences {
+  const UserPreferences({
+    this.deviceAlerts = true,
+    this.sharingAlerts = true,
+    this.uploadAlerts = true,
+    this.profileVisibility = 'family',
+    this.analyticsEnabled = false,
+  });
+
+  final bool deviceAlerts;
+  final bool sharingAlerts;
+  final bool uploadAlerts;
+  final String profileVisibility;
+  final bool analyticsEnabled;
+
+  factory UserPreferences.fromJson(Map<String, dynamic> json) {
+    return UserPreferences(
+      deviceAlerts: json['device_alerts'] != false,
+      sharingAlerts: json['sharing_alerts'] != false,
+      uploadAlerts: json['upload_alerts'] != false,
+      profileVisibility: _string(
+        json['profile_visibility'],
+        fallback: 'family',
+      ),
+      analyticsEnabled: json['analytics_enabled'] == true,
+    );
+  }
+
+  Map<String, Object> toJson() {
+    return {
+      'device_alerts': deviceAlerts,
+      'sharing_alerts': sharingAlerts,
+      'upload_alerts': uploadAlerts,
+      'profile_visibility': profileVisibility,
+      'analytics_enabled': analyticsEnabled,
+    };
+  }
+}
+
 class UploadOptions {
   const UploadOptions({
     this.direction = 'auto',
@@ -551,4 +807,11 @@ List<List<int>> _palette(Object? value) {
       .whereType<List>()
       .map((entry) => entry.map((item) => _int(item)).toList(growable: false))
       .toList(growable: false);
+}
+
+List<String> _stringList(Object? value) {
+  if (value is! List) {
+    return const [];
+  }
+  return value.map((item) => '$item').toList(growable: false);
 }

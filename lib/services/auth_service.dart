@@ -28,6 +28,42 @@ class AuthService {
     return AuthSession.fromJson(json);
   }
 
+  Future<AuthSession> loginWithApple({
+    required String identityToken,
+    required String authorizationCode,
+    String? email,
+    String? fullName,
+  }) async {
+    final json = await _api.postJson(
+      '/api/auth/oauth/apple',
+      body: {
+        'identity_token': identityToken,
+        'authorization_code': authorizationCode,
+        'email': email,
+        'full_name': fullName,
+      },
+    );
+    return AuthSession.fromJson(json);
+  }
+
+  Future<AuthSession> loginWithGoogle({
+    required String identityToken,
+    String? authorizationCode,
+    String? email,
+    String? displayName,
+  }) async {
+    final json = await _api.postJson(
+      '/api/auth/oauth/google',
+      body: {
+        'identity_token': identityToken,
+        'authorization_code': authorizationCode,
+        'email': email,
+        'display_name': displayName,
+      },
+    );
+    return AuthSession.fromJson(json);
+  }
+
   Future<User> me(String bearerToken) async {
     final json = await _api.getJson('/api/me', bearerToken: bearerToken);
     return User.fromJson(json);
