@@ -37,6 +37,13 @@ class GroupService {
     );
   }
 
+  Future<void> deleteGroup({
+    required String bearerToken,
+    required String groupId,
+  }) async {
+    await _api.deleteJson('/api/me/groups/$groupId', bearerToken: bearerToken);
+  }
+
   Future<List<AccountGroupMember>> listMembers({
     required String bearerToken,
     required String groupId,
@@ -121,6 +128,17 @@ class GroupService {
       '/api/me/groups/$groupId/devices',
       bearerToken: bearerToken,
       body: {'device_id': deviceId, 'role': role},
+    );
+  }
+
+  Future<void> removeDevice({
+    required String bearerToken,
+    required String groupId,
+    required String deviceId,
+  }) async {
+    await _api.deleteJson(
+      '/api/me/groups/$groupId/devices/$deviceId',
+      bearerToken: bearerToken,
     );
   }
 }

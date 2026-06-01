@@ -106,6 +106,33 @@ Photo object:
 
 List responses should use `{ "albums": [...] }` and `{ "photos": [...] }`; the app also accepts `{ "items": [...] }`.
 
+Upload and album association requirements:
+
+- `POST /api/images` should either return `photo_id` with the existing `image_id`, or create a photo library row that is immediately visible from `GET /api/me/photos`.
+- `POST /api/me/albums/{album_id}/photos/{photo_id}` must receive the stable photo-library id, not just a storage image id. The app now resolves the photo id from `photo_id` first, then from `GET /api/me/photos` by matching `image_id`.
+- If the server keeps `photo_id == image_id`, that is still compatible, but the response/list data must be consistent to avoid `404 unknown photo` immediately after upload.
+
+## Sharing Groups
+
+```http
+GET /api/me/groups
+POST /api/me/groups
+PATCH /api/me/groups/{group_id}
+DELETE /api/me/groups/{group_id}
+GET /api/me/groups/{group_id}/members
+POST /api/me/groups/{group_id}/invites
+POST /api/me/group-invites/accept
+GET /api/me/groups/{group_id}/devices
+POST /api/me/groups/{group_id}/devices
+DELETE /api/me/groups/{group_id}/devices/{device_id}
+```
+
+Requirements:
+
+- Group owners/admins can delete groups they created.
+- Deleting a group should clean up group invites, member links, and shared device links for that group.
+- Removing a shared device from a group should not delete the underlying device from the owner's account.
+
 ## Timeline
 
 ```http
@@ -210,5 +237,6 @@ Requirements:
 - Returned JSON must be compatible with `AppDevice`.
 - The virtual device should appear in `GET /api/me/devices`.
 - `POST /api/me/devices/{device_id}/assign` should work for virtual devices.
+- `DELETE /api/me/devices/{device_id}` should unbind/delete virtual devices through the same endpoint used by physical devices.
 - Assignment should increment `current_version`, update `current_image_id`, and create timeline/status events so the app can test the full UX.
 - Virtual devices must be clearly identified by `device_id` prefix or a backend-only type flag; they must never be used by real ESP32 polling tokens.

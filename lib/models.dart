@@ -504,10 +504,12 @@ class ImageInfo {
     required this.dataSize,
     required this.dataUrl,
     required this.previewUrl,
+    this.photoId,
     this.createdAt,
   });
 
   final String imageId;
+  final String? photoId;
   final int width;
   final int height;
   final String format;
@@ -521,6 +523,7 @@ class ImageInfo {
   factory ImageInfo.fromJson(Map<String, dynamic> json) {
     return ImageInfo(
       imageId: _string(json['image_id']),
+      photoId: _nullableString(json['photo_id']),
       width: _int(json['width']),
       height: _int(json['height']),
       format: _string(json['format']),
@@ -585,7 +588,7 @@ class InkPhoto {
 
   factory InkPhoto.fromImageInfo(ImageInfo image, {String? deviceId}) {
     return InkPhoto(
-      photoId: image.imageId,
+      photoId: image.photoId ?? image.imageId,
       imageId: image.imageId,
       title: image.imageId,
       previewUrl: image.previewUrl,

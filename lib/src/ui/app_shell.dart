@@ -800,28 +800,50 @@ class _SendPage extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
                 children: [
-                  Expanded(
+                  SizedBox(
+                    width: 180,
                     child: InkButton.secondary(
                       onPressed: () => controller.chooseImage(s),
                       icon: Icons.add_photo_alternate_outlined,
                       label: s.chooseImage,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
+                  SizedBox(
+                    width: 190,
                     child: InkButton.primary(
                       onPressed: controller.selectedImage == null
                           ? null
-                          : () => controller.uploadAndAssign(s),
-                      icon: Icons.send_outlined,
+                          : () => controller.uploadSelectedImageForPreview(s),
+                      icon: Icons.tune_outlined,
                       label: device == null
-                          ? (s.isZh ? '上传到相册' : 'Upload to album')
-                          : s.sendToFrame,
+                          ? (s.isZh ? '上传并预览' : 'Upload preview')
+                          : (s.isZh ? '生成预览' : 'Generate preview'),
                     ),
                   ),
+                  if (device != null)
+                    SizedBox(
+                      width: 190,
+                      child: InkButton.primary(
+                        onPressed: controller.latestImage == null
+                            ? null
+                            : () => controller
+                                  .assignLatestImageToSelectedDevice(s),
+                        icon: Icons.send_outlined,
+                        label: s.isZh ? '确认下发' : 'Confirm send',
+                      ),
+                    ),
                 ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                s.isZh
+                    ? '先生成六色墨水屏预览，确认画面没问题后再下发到设备。'
+                    : 'Generate the six-color e-ink preview first, then confirm before sending to the frame.',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
           ),
@@ -1016,7 +1038,21 @@ class _DevicesPage extends StatelessWidget {
                       label: Text(s.loadMembersStatus),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () => controller.unbindSelectedDevice(s),
+                      onPressed: () async {
+                        final confirmed = await _confirmDestructiveAction(
+                          context,
+                          title: s.isZh
+                              ? '解绑 / 删除设备'
+                              : 'Unbind / delete device',
+                          message: s.isZh
+                              ? '设备将从当前账号移除。虚拟测试设备也会从云端测试列表删除。'
+                              : 'This removes the device from your account. Virtual test devices are also deleted from the cloud test list.',
+                          confirmLabel: s.isZh ? '解绑设备' : 'Unbind device',
+                        );
+                        if (confirmed && context.mounted) {
+                          controller.unbindSelectedDevice(s);
+                        }
+                      },
                       icon: const Icon(Icons.link_off),
                       label: Text(s.unbindLeave),
                     ),
@@ -1081,6 +1117,32 @@ class _SharingEntryPanel extends StatelessWidget {
   }
 }
 
+Future<bool> _confirmDestructiveAction(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String confirmLabel,
+}) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(confirmLabel),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
+}
+
 class _SharingPage extends StatelessWidget {
   const _SharingPage({required this.controller});
 
@@ -1134,10 +1196,25 @@ class _SharingPage extends StatelessWidget {
                   icon: const Icon(Icons.group_add_outlined),
                   label: Text(s.createGroup),
                 ),
-                const SizedBox(height: 16),
+                if (controller.groups.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: _EmptyState(
+                      icon: Icons.group_outlined,
+                      text: s.noGroups,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          _Panel(
+            title: s.inviteMember,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                 if (controller.groups.isEmpty)
                   _EmptyState(icon: Icons.group_outlined, text: s.noGroups)
-                else
+                else ...[
                   DropdownButtonFormField<String>(
                     initialValue: group?.groupId,
                     items: [
@@ -1162,14 +1239,28 @@ class _SharingPage extends StatelessWidget {
                     },
                     decoration: InputDecoration(labelText: s.selectGroup),
                   ),
-              ],
-            ),
-          ),
-          _Panel(
-            title: s.inviteMember,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: group == null
+                        ? null
+                        : () async {
+                            final confirmed = await _confirmDestructiveAction(
+                              context,
+                              title: s.isZh ? '删除组' : 'Delete group',
+                              message: s.isZh
+                                  ? '删除后成员邀请和共享设备关系会从该组移除。'
+                                  : 'Members, invites, and shared device links in this group will be removed.',
+                              confirmLabel: s.isZh ? '删除组' : 'Delete group',
+                            );
+                            if (confirmed && context.mounted) {
+                              controller.deleteSelectedGroup(s);
+                            }
+                          },
+                    icon: const Icon(Icons.delete_outline),
+                    label: Text(s.isZh ? '删除当前组' : 'Delete selected group'),
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 InkTextField(
                   controller: controller.groupInviteEmailController,
                   keyboardType: TextInputType.emailAddress,
@@ -1268,6 +1359,29 @@ class _SharingPage extends StatelessWidget {
                     _DeviceTile(
                       device: item,
                       selected: item.deviceId == device?.deviceId,
+                      trailing: IconButton(
+                        onPressed: group == null
+                            ? null
+                            : () async {
+                                final confirmed = await _confirmDestructiveAction(
+                                  context,
+                                  title: s.isZh
+                                      ? '移除共享设备'
+                                      : 'Remove shared device',
+                                  message: s.isZh
+                                      ? '这只会从当前组移除共享关系，不会删除设备本身。'
+                                      : 'This only removes the shared link from this group. The device itself is not deleted.',
+                                  confirmLabel: s.isZh ? '移除' : 'Remove',
+                                );
+                                if (confirmed && context.mounted) {
+                                  controller.removeSelectedDeviceFromGroup(
+                                    s,
+                                    item,
+                                  );
+                                }
+                              },
+                        icon: const Icon(Icons.link_off),
+                      ),
                       onTap: () => controller.selectDevice(item),
                     ),
               ],
@@ -1932,8 +2046,8 @@ class _InfoPage extends StatelessWidget {
             child: Text(
               about
                   ? (s.isZh
-                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.15。'
-                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.15.')
+                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.16。'
+                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.16.')
                   : (s.isZh
                         ? '如需反馈，请在 GitHub 项目中提交 issue，并附上设备型号、系统版本和问题截图。'
                         : 'For feedback, open a GitHub issue with your device model, OS version, and screenshots.'),
@@ -3491,7 +3605,7 @@ class _SettingsList extends StatelessWidget {
       _SettingsRow(
         Icons.info_outline,
         s.isZh ? '关于 InkSplash' : 'About InkSplash',
-        'v1.0.15',
+        'v1.0.16',
         () => Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => const _InfoPage(kind: _InfoPageKind.about),
@@ -3587,11 +3701,13 @@ class _DeviceTile extends StatelessWidget {
     required this.device,
     required this.selected,
     required this.onTap,
+    this.trailing,
   });
 
   final AppDevice device;
   final bool selected;
   final VoidCallback onTap;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -3609,10 +3725,12 @@ class _DeviceTile extends StatelessWidget {
         if (device.rssi != null) '${device.rssi} dBm',
       ].join(' | '),
       dotColor: selected ? InkTheme.eInkBlue : null,
-      trailing: Icon(
-        selected ? Icons.check_circle : Icons.chevron_right,
-        color: selected ? InkTheme.eInkBlue : null,
-      ),
+      trailing:
+          trailing ??
+          Icon(
+            selected ? Icons.check_circle : Icons.chevron_right,
+            color: selected ? InkTheme.eInkBlue : null,
+          ),
       onTap: onTap,
     );
   }

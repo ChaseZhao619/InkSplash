@@ -499,6 +499,20 @@ class AppController extends ChangeNotifier {
     });
   }
 
+  Future<void> deleteSelectedGroup(AppStrings s) async {
+    final token = requireLogin(s);
+    final group = requireSelectedGroup(s);
+    await runAction(s, s.deleteGroupAction, () async {
+      await _groupService.deleteGroup(
+        bearerToken: token,
+        groupId: group.groupId,
+      );
+      groupMembers = const [];
+      groupDevices = const [];
+      await _refreshGroupsWithToken(token);
+    });
+  }
+
   Future<void> refreshGroupDetail(AppStrings s) async {
     final token = requireLogin(s);
     final group = requireSelectedGroup(s);
@@ -544,6 +558,22 @@ class AppController extends ChangeNotifier {
         groupId: group.groupId,
         deviceId: device.deviceId,
         role: groupDeviceRole,
+      );
+      await _refreshGroupDetailWithToken(token, group.groupId);
+    });
+  }
+
+  Future<void> removeSelectedDeviceFromGroup(
+    AppStrings s,
+    AppDevice device,
+  ) async {
+    final token = requireLogin(s);
+    final group = requireSelectedGroup(s);
+    await runAction(s, s.isZh ? '移除共享设备' : 'Remove shared device', () async {
+      await _groupService.removeDevice(
+        bearerToken: token,
+        groupId: group.groupId,
+        deviceId: device.deviceId,
       );
       await _refreshGroupDetailWithToken(token, group.groupId);
     });
@@ -723,24 +753,8 @@ class AppController extends ChangeNotifier {
           s.isZh ? '请选择目标相册或设备。' : 'Choose a target album or device.',
         );
       }
-      final uploadFile = await _prepareUploadFile(picked, fullSize: true);
-      final image = await _imageService.uploadImage(
-        bearerToken: token,
-        filePath: uploadFile.path,
-        fileName: uploadFile.fileName,
-        options: UploadOptions(
-          direction: direction,
-          mode: mode,
-          dither: dither,
-        ),
-      );
-      if (selectedAlbum != null) {
-        await _albumService.addPhotoToAlbum(
-          bearerToken: token,
-          albumId: selectedAlbum!.albumId,
-          photoId: image.imageId,
-        );
-      }
+      final image = await _uploadSelectedImage(token, picked);
+      await _addImageToSelectedAlbumIfNeeded(s, token, image);
       if (device != null) {
         await _deviceService.assignImage(
           bearerToken: token,
@@ -786,6 +800,80 @@ class AppController extends ChangeNotifier {
           orElse: () => device,
         );
       }
+      await _tryRefreshUiFeaturesWithToken(token);
+    });
+  }
+
+  Future<void> uploadSelectedImageForPreview(AppStrings s) async {
+    await runAction(s, s.generatePreviewAction, () async {
+      final token = requireLogin(s);
+      final picked = selectedImage;
+      if (picked == null) {
+        throw ApiError(s.selectImageFirst);
+      }
+      final image = await _uploadSelectedImage(token, picked);
+      await _addImageToSelectedAlbumIfNeeded(s, token, image);
+      final preview = await _imageService.getPreviewPng(
+        image,
+        bearerToken: token,
+      );
+      latestImage = image;
+      previewPng = preview;
+      photos = [InkPhoto.fromImageInfo(image), ...photos];
+      timelineEvents = [
+        InkTimelineEvent(
+          eventId: 'local-preview-${image.imageId}',
+          type: 'photo_uploaded',
+          title: s.isZh ? '预览已生成' : 'Preview ready',
+          subtitle: selectedAlbum?.title,
+          photoId: image.photoId ?? image.imageId,
+          albumId: selectedAlbum?.albumId,
+          previewUrl: image.previewUrl,
+          createdAt: image.createdAt,
+        ),
+        ...timelineEvents,
+      ];
+      await _tryRefreshUiFeaturesWithToken(token);
+    });
+  }
+
+  Future<void> assignLatestImageToSelectedDevice(AppStrings s) async {
+    await runAction(s, s.confirmSendAction, () async {
+      final token = requireLogin(s);
+      final device = requireSelectedDevice(s);
+      final image = latestImage;
+      if (image == null) {
+        throw ApiError(s.isZh ? '请先生成预览。' : 'Generate a preview first.');
+      }
+      await _deviceService.assignImage(
+        bearerToken: token,
+        deviceId: device.deviceId,
+        imageId: image.imageId,
+      );
+      final loadedDevices = await _deviceService.listDevices(token);
+      devices = loadedDevices;
+      selectedDevice = loadedDevices.firstWhere(
+        (item) => item.deviceId == device.deviceId,
+        orElse: () => device,
+      );
+      photos = [
+        InkPhoto.fromImageInfo(image, deviceId: device.deviceId),
+        ...photos,
+      ];
+      timelineEvents = [
+        InkTimelineEvent(
+          eventId: 'local-assigned-${image.imageId}',
+          type: 'photo_assigned',
+          title: s.isZh ? '照片已下发' : 'Photo sent',
+          subtitle: _deviceTitle(device),
+          photoId: image.photoId ?? image.imageId,
+          albumId: selectedAlbum?.albumId,
+          deviceId: device.deviceId,
+          previewUrl: image.previewUrl,
+          createdAt: image.createdAt,
+        ),
+        ...timelineEvents,
+      ];
       await _tryRefreshUiFeaturesWithToken(token);
     });
   }
@@ -876,11 +964,7 @@ class AppController extends ChangeNotifier {
       throw ApiError(s.isZh ? '请先上传照片。' : 'Upload a photo first.');
     }
     await runAction(s, s.isZh ? '加入相册' : 'Add to album', () async {
-      await _albumService.addPhotoToAlbum(
-        bearerToken: token,
-        albumId: album.albumId,
-        photoId: image.imageId,
-      );
+      await _addImageToAlbum(s, token, album, image);
       await _refreshAlbumsWithToken(token, preferredAlbumId: album.albumId);
       photos = await _albumService.listPhotos(token);
     });
@@ -897,22 +981,8 @@ class AppController extends ChangeNotifier {
       if (picked == null) {
         throw ApiError(s.selectImageFirst);
       }
-      final uploadFile = await _prepareUploadFile(picked, fullSize: true);
-      final image = await _imageService.uploadImage(
-        bearerToken: token,
-        filePath: uploadFile.path,
-        fileName: uploadFile.fileName,
-        options: UploadOptions(
-          direction: direction,
-          mode: mode,
-          dither: dither,
-        ),
-      );
-      await _albumService.addPhotoToAlbum(
-        bearerToken: token,
-        albumId: album.albumId,
-        photoId: image.imageId,
-      );
+      final image = await _uploadSelectedImage(token, picked);
+      await _addImageToAlbum(s, token, album, image);
       final preview = await _imageService.getPreviewPng(
         image,
         bearerToken: token,
@@ -926,7 +996,7 @@ class AppController extends ChangeNotifier {
           type: 'photo_uploaded',
           title: s.isZh ? '照片已上传' : 'Photo uploaded',
           subtitle: album.title,
-          photoId: image.imageId,
+          photoId: image.photoId ?? image.imageId,
           albumId: album.albumId,
           previewUrl: image.previewUrl,
           createdAt: image.createdAt,
@@ -1210,6 +1280,92 @@ class AppController extends ChangeNotifier {
     if (!RegExp(r'^[A-Za-z0-9]{6}$').hasMatch(code)) {
       throw ApiError(s.invalidSixCode);
     }
+  }
+
+  Future<ImageInfo> _uploadSelectedImage(String token, XFile picked) async {
+    final uploadFile = await _prepareUploadFile(picked, fullSize: true);
+    return _imageService.uploadImage(
+      bearerToken: token,
+      filePath: uploadFile.path,
+      fileName: uploadFile.fileName,
+      options: UploadOptions(direction: direction, mode: mode, dither: dither),
+    );
+  }
+
+  Future<void> _addImageToSelectedAlbumIfNeeded(
+    AppStrings s,
+    String token,
+    ImageInfo image,
+  ) async {
+    final album = selectedAlbum;
+    if (album == null) {
+      return;
+    }
+    await _addImageToAlbum(s, token, album, image);
+  }
+
+  Future<void> _addImageToAlbum(
+    AppStrings s,
+    String token,
+    InkAlbum album,
+    ImageInfo image,
+  ) async {
+    final photoId = await _resolvePhotoIdForImage(token, image);
+    try {
+      await _albumService.addPhotoToAlbum(
+        bearerToken: token,
+        albumId: album.albumId,
+        photoId: photoId,
+      );
+    } on ApiError catch (error) {
+      final retriedPhotoId = await _resolvePhotoIdForImage(
+        token,
+        image,
+        forceRefresh: true,
+      );
+      if (retriedPhotoId != photoId) {
+        await _albumService.addPhotoToAlbum(
+          bearerToken: token,
+          albumId: album.albumId,
+          photoId: retriedPhotoId,
+        );
+        return;
+      }
+      if (error.statusCode == 404 &&
+          error.message.toLowerCase().contains('unknown photo')) {
+        throw ApiError(
+          s.isZh
+              ? '上传成功，但服务端还没有返回可加入相册的 photo_id。请稍后刷新，或确认上传接口会创建照片库记录。'
+              : 'Upload succeeded, but the server did not return a photo_id that can be added to albums. Refresh shortly or confirm uploads create photo library records.',
+          statusCode: error.statusCode,
+        );
+      }
+      rethrow;
+    }
+  }
+
+  Future<String> _resolvePhotoIdForImage(
+    String token,
+    ImageInfo image, {
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh && image.photoId?.isNotEmpty == true) {
+      return image.photoId!;
+    }
+    if (forceRefresh) {
+      await Future<void>.delayed(const Duration(milliseconds: 450));
+    }
+    final loadedPhotos = await _albumService.listPhotos(token);
+    photos = loadedPhotos;
+    for (final photo in loadedPhotos) {
+      if (photo.imageId == image.imageId ||
+          photo.photoId == image.imageId ||
+          photo.previewUrl == image.previewUrl ||
+          photo.dataUrl == image.dataUrl) {
+        return photo.photoId;
+      }
+    }
+    return image.photoId ?? image.imageId;
   }
 
   Future<void> _refreshSelectedImagePreview() async {

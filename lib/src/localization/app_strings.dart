@@ -223,6 +223,9 @@ class AppStrings {
   String get provisionClaimAction => isZh ? '配网绑定' : 'Provision and claim';
   String get chooseImageAction => isZh ? '选择图片' : 'Choose image';
   String get uploadAssignAction => isZh ? '上传下发' : 'Upload and assign';
+  String get generatePreviewAction => isZh ? '生成预览' : 'Generate preview';
+  String get confirmSendAction => isZh ? '确认下发' : 'Confirm send';
+  String get deleteGroupAction => isZh ? '删除组' : 'Delete group';
   String get savedLoginExpired => isZh ? '已保存登录已过期' : 'Saved login expired';
 }
 

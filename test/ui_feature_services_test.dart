@@ -5,8 +5,10 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:ink_splash/models.dart';
 import 'package:ink_splash/services/api_client.dart';
+import 'package:ink_splash/services/album_service.dart';
 import 'package:ink_splash/services/auth_service.dart';
 import 'package:ink_splash/services/device_service.dart';
+import 'package:ink_splash/services/group_service.dart';
 import 'package:ink_splash/services/profile_service.dart';
 
 void main() {
@@ -77,6 +79,21 @@ void main() {
       expect(user.avatarUrl, 'https://example.com/avatar.png');
       expect(user.bio, 'Family memories');
       expect(user.preferredName, 'Ink Keeper');
+
+      final image = ImageInfo.fromJson({
+        'image_id': 'img_1',
+        'photo_id': 'pho_1',
+        'width': 480,
+        'height': 800,
+        'format': 'png',
+        'palette': [],
+        'sha256': 'abc',
+        'data_size': 12,
+        'data_url': '/api/images/img_1/data',
+        'preview_url': '/api/images/img_1/preview',
+      });
+      expect(image.photoId, 'pho_1');
+      expect(InkPhoto.fromImageInfo(image).photoId, 'pho_1');
     },
   );
 
@@ -160,5 +177,33 @@ void main() {
     expect(user.bio, 'Warm memories');
     expect(device.deviceId, 'virtual_1');
     expect(device.nickname, 'Test Frame');
+  });
+
+  test('album and group mutation services use expected endpoints', () async {
+    final seen = <String>[];
+    final client = MockClient((request) async {
+      seen.add('${request.method} ${request.url.path}');
+      return http.Response('{}', 200);
+    });
+    final api = EpaperApiClient(
+      baseUrl: 'http://localhost',
+      httpClient: client,
+    );
+
+    await AlbumService(
+      api,
+    ).addPhotoToAlbum(bearerToken: 'token', albumId: 'alb_1', photoId: 'pho_1');
+    await GroupService(api).deleteGroup(bearerToken: 'token', groupId: 'grp_1');
+    await GroupService(api).removeDevice(
+      bearerToken: 'token',
+      groupId: 'grp_1',
+      deviceId: 'virtual_1',
+    );
+
+    expect(seen, [
+      'POST /api/me/albums/alb_1/photos/pho_1',
+      'DELETE /api/me/groups/grp_1',
+      'DELETE /api/me/groups/grp_1/devices/virtual_1',
+    ]);
   });
 }
