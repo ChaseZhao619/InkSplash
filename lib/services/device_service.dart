@@ -43,6 +43,21 @@ class DeviceBindingService {
         .toList(growable: false);
   }
 
+  Future<AppDevice> createVirtualDevice({
+    required String bearerToken,
+    String nickname = 'Test Frame',
+    String profile = 'six_color_eink',
+  }) async {
+    final json = await _api.postJson(
+      '/api/me/devices/virtual',
+      bearerToken: bearerToken,
+      body: {'nickname': nickname, 'profile': profile},
+    );
+    return AppDevice.fromJson(
+      json['device'] is Map ? _map(json['device']) : json,
+    );
+  }
+
   Future<AppDevice> getDevice({
     required String bearerToken,
     required String deviceId,
@@ -171,4 +186,14 @@ class DeviceBindingService {
         )
         .toList(growable: false);
   }
+}
+
+Map<String, dynamic> _map(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry('$key', value));
+  }
+  return const {};
 }

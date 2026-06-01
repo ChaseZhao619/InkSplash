@@ -18,6 +18,10 @@ class User {
     required this.emailVerified,
     required this.createdAt,
     this.emailVerifiedAt,
+    this.displayName,
+    this.avatarUrl,
+    this.bio,
+    this.updatedAt,
   });
 
   final String userId;
@@ -25,6 +29,43 @@ class User {
   final bool emailVerified;
   final String? emailVerifiedAt;
   final String? createdAt;
+  final String? displayName;
+  final String? avatarUrl;
+  final String? bio;
+  final String? updatedAt;
+
+  String get preferredName {
+    final name = displayName?.trim();
+    if (name != null && name.isNotEmpty) {
+      return name;
+    }
+    final at = email.indexOf('@');
+    return at > 0 ? email.substring(0, at) : email;
+  }
+
+  User copyWith({
+    String? userId,
+    String? email,
+    bool? emailVerified,
+    String? emailVerifiedAt,
+    String? createdAt,
+    String? displayName,
+    String? avatarUrl,
+    String? bio,
+    String? updatedAt,
+  }) {
+    return User(
+      userId: userId ?? this.userId,
+      email: email ?? this.email,
+      emailVerified: emailVerified ?? this.emailVerified,
+      emailVerifiedAt: emailVerifiedAt ?? this.emailVerifiedAt,
+      createdAt: createdAt ?? this.createdAt,
+      displayName: displayName ?? this.displayName,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      bio: bio ?? this.bio,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
@@ -33,6 +74,10 @@ class User {
       emailVerified: json['email_verified'] == true,
       emailVerifiedAt: _nullableString(json['email_verified_at']),
       createdAt: _nullableString(json['created_at']),
+      displayName: _nullableString(json['display_name'] ?? json['name']),
+      avatarUrl: _nullableString(json['avatar_url']),
+      bio: _nullableString(json['bio']),
+      updatedAt: _nullableString(json['updated_at']),
     );
   }
 }

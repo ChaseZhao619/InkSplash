@@ -48,6 +48,8 @@ class AppController extends ChangeNotifier {
   final groupInviteCodeController = TextEditingController();
   final albumNameController = TextEditingController();
   final albumSearchController = TextEditingController();
+  final profileNameController = TextEditingController();
+  final profileBioController = TextEditingController();
 
   final ProvisioningService _provisioning;
   final SessionStore _sessionStore;
@@ -100,6 +102,7 @@ class AppController extends ChangeNotifier {
   NotificationService get _notificationService => NotificationService(_api);
   ProfileService get _profileService => ProfileService(_api);
   String? get bearerToken => session?.accessToken;
+  User? get currentUser => session?.user;
 
   Future<void> restoreSession(AppStrings s) async {
     final stored = await _sessionStore.load();
@@ -124,6 +127,7 @@ class AppController extends ChangeNotifier {
       await _tryRefreshUiFeaturesWithToken(stored.accessToken);
       selectedDevice = loadedDevices.isEmpty ? null : loadedDevices.first;
       renameController.text = selectedDevice?.nickname ?? '';
+      _syncProfileControllers(session?.user);
     } catch (error) {
       await _sessionStore.clear();
       message = '${s.savedLoginExpired}: $error';
@@ -181,6 +185,7 @@ class AppController extends ChangeNotifier {
       await _tryRefreshUiFeaturesWithToken(nextSession.accessToken);
       selectedDevice = loadedDevices.isEmpty ? null : loadedDevices.first;
       renameController.text = selectedDevice?.nickname ?? '';
+      _syncProfileControllers(session?.user);
     });
   }
 
@@ -271,6 +276,7 @@ class AppController extends ChangeNotifier {
     await _tryRefreshUiFeaturesWithToken(nextSession.accessToken);
     selectedDevice = loadedDevices.isEmpty ? null : loadedDevices.first;
     renameController.text = selectedDevice?.nickname ?? '';
+    _syncProfileControllers(session?.user);
   }
 
   Future<void> logout(AppStrings s) async {
@@ -292,6 +298,8 @@ class AppController extends ChangeNotifier {
       storageSummary = null;
       selectedAlbum = null;
       uiFeatureError = null;
+      profileNameController.clear();
+      profileBioController.clear();
     });
   }
 
@@ -311,6 +319,23 @@ class AppController extends ChangeNotifier {
         renameController.text = selectedDevice?.nickname ?? '';
       }
       await _tryRefreshUiFeaturesWithToken(token);
+    });
+  }
+
+  Future<void> updateProfile(AppStrings s) async {
+    final token = requireLogin(s);
+    await runAction(s, s.isZh ? '更新个人资料' : 'Update profile', () async {
+      final updated = await _profileService.updateProfile(
+        bearerToken: token,
+        displayName: profileNameController.text.trim().isEmpty
+            ? null
+            : profileNameController.text.trim(),
+        bio: profileBioController.text.trim().isEmpty
+            ? null
+            : profileBioController.text.trim(),
+      );
+      _replaceSessionUser(updated);
+      _syncProfileControllers(updated);
     });
   }
 
@@ -689,12 +714,14 @@ class AppController extends ChangeNotifier {
     await runAction(s, s.uploadAssignAction, () async {
       final token = requireLogin(s);
       final device = selectedDevice;
-      if (device == null) {
-        throw ApiError(s.selectBindDeviceFirst);
-      }
       final picked = selectedImage;
       if (picked == null) {
         throw ApiError(s.selectImageFirst);
+      }
+      if (device == null && selectedAlbum == null) {
+        throw ApiError(
+          s.isZh ? '请选择目标相册或设备。' : 'Choose a target album or device.',
+        );
       }
       final uploadFile = await _prepareUploadFile(picked, fullSize: true);
       final image = await _imageService.uploadImage(
@@ -707,29 +734,45 @@ class AppController extends ChangeNotifier {
           dither: dither,
         ),
       );
-      await _deviceService.assignImage(
-        bearerToken: token,
-        deviceId: device.deviceId,
-        imageId: image.imageId,
-      );
+      if (selectedAlbum != null) {
+        await _albumService.addPhotoToAlbum(
+          bearerToken: token,
+          albumId: selectedAlbum!.albumId,
+          photoId: image.imageId,
+        );
+      }
+      if (device != null) {
+        await _deviceService.assignImage(
+          bearerToken: token,
+          deviceId: device.deviceId,
+          imageId: image.imageId,
+        );
+      }
       final preview = await _imageService.getPreviewPng(
         image,
         bearerToken: token,
       );
-      final loadedDevices = await _deviceService.listDevices(token);
+      final loadedDevices = device == null
+          ? devices
+          : await _deviceService.listDevices(token);
       latestImage = image;
       photos = [
-        InkPhoto.fromImageInfo(image, deviceId: device.deviceId),
+        InkPhoto.fromImageInfo(image, deviceId: device?.deviceId),
         ...photos,
       ];
       timelineEvents = [
         InkTimelineEvent(
           eventId: 'local-${image.imageId}',
-          type: 'photo_assigned',
-          title: s.isZh ? '照片已下发' : 'Photo sent',
-          subtitle: _deviceTitle(device),
+          type: device == null ? 'photo_uploaded' : 'photo_assigned',
+          title: device == null
+              ? (s.isZh ? '照片已上传' : 'Photo uploaded')
+              : (s.isZh ? '照片已下发' : 'Photo sent'),
+          subtitle: device == null
+              ? selectedAlbum?.title
+              : _deviceTitle(device),
           photoId: image.imageId,
-          deviceId: device.deviceId,
+          albumId: selectedAlbum?.albumId,
+          deviceId: device?.deviceId,
           previewUrl: image.previewUrl,
           createdAt: image.createdAt,
         ),
@@ -737,10 +780,13 @@ class AppController extends ChangeNotifier {
       ];
       previewPng = preview;
       devices = loadedDevices;
-      selectedDevice = loadedDevices.firstWhere(
-        (item) => item.deviceId == device.deviceId,
-        orElse: () => device,
-      );
+      if (device != null) {
+        selectedDevice = loadedDevices.firstWhere(
+          (item) => item.deviceId == device.deviceId,
+          orElse: () => device,
+        );
+      }
+      await _tryRefreshUiFeaturesWithToken(token);
     });
   }
 
@@ -837,6 +883,76 @@ class AppController extends ChangeNotifier {
       );
       await _refreshAlbumsWithToken(token, preferredAlbumId: album.albumId);
       photos = await _albumService.listPhotos(token);
+    });
+  }
+
+  Future<void> uploadToSelectedAlbum(AppStrings s) async {
+    await runAction(s, s.isZh ? '上传到相册' : 'Upload to album', () async {
+      final token = requireLogin(s);
+      final album = selectedAlbum;
+      if (album == null) {
+        throw ApiError(s.isZh ? '请先选择相册。' : 'Select an album first.');
+      }
+      final picked = selectedImage;
+      if (picked == null) {
+        throw ApiError(s.selectImageFirst);
+      }
+      final uploadFile = await _prepareUploadFile(picked, fullSize: true);
+      final image = await _imageService.uploadImage(
+        bearerToken: token,
+        filePath: uploadFile.path,
+        fileName: uploadFile.fileName,
+        options: UploadOptions(
+          direction: direction,
+          mode: mode,
+          dither: dither,
+        ),
+      );
+      await _albumService.addPhotoToAlbum(
+        bearerToken: token,
+        albumId: album.albumId,
+        photoId: image.imageId,
+      );
+      final preview = await _imageService.getPreviewPng(
+        image,
+        bearerToken: token,
+      );
+      latestImage = image;
+      previewPng = preview;
+      photos = [InkPhoto.fromImageInfo(image), ...photos];
+      timelineEvents = [
+        InkTimelineEvent(
+          eventId: 'local-${image.imageId}',
+          type: 'photo_uploaded',
+          title: s.isZh ? '照片已上传' : 'Photo uploaded',
+          subtitle: album.title,
+          photoId: image.imageId,
+          albumId: album.albumId,
+          previewUrl: image.previewUrl,
+          createdAt: image.createdAt,
+        ),
+        ...timelineEvents,
+      ];
+      await _refreshAlbumsWithToken(token, preferredAlbumId: album.albumId);
+      await _tryRefreshUiFeaturesWithToken(token);
+    });
+  }
+
+  Future<void> createVirtualDevice(AppStrings s) async {
+    final token = requireLogin(s);
+    await runAction(s, s.isZh ? '创建测试设备' : 'Create test device', () async {
+      final device = await _deviceService.createVirtualDevice(
+        bearerToken: token,
+        nickname: s.isZh ? '测试墨水屏' : 'Test Frame',
+      );
+      final loadedDevices = await _deviceService.listDevices(token);
+      devices = loadedDevices;
+      selectedDevice = loadedDevices.firstWhere(
+        (item) => item.deviceId == device.deviceId,
+        orElse: () => device,
+      );
+      renameController.text = selectedDevice?.nickname ?? '';
+      await _tryRefreshUiFeaturesWithToken(token);
     });
   }
 
@@ -1038,6 +1154,7 @@ class AppController extends ChangeNotifier {
   Future<void> _refreshUiFeaturesWithToken(String token) async {
     await _refreshAlbumsWithToken(token);
     final results = await Future.wait<Object>([
+      _profileService.getProfile(token),
       _albumService.listPhotos(token),
       _timelineService.listTimeline(
         bearerToken: token,
@@ -1049,11 +1166,14 @@ class AppController extends ChangeNotifier {
       _profileService.getStorage(token),
       _profileService.getPreferences(token),
     ]);
-    photos = results[0] as List<InkPhoto>;
-    timelineEvents = results[1] as List<InkTimelineEvent>;
-    notifications = results[2] as List<InkNotification>;
-    storageSummary = results[3] as StorageSummary;
-    preferences = results[4] as UserPreferences;
+    final user = results[0] as User;
+    _replaceSessionUser(user);
+    _syncProfileControllers(user);
+    photos = results[1] as List<InkPhoto>;
+    timelineEvents = results[2] as List<InkTimelineEvent>;
+    notifications = results[3] as List<InkNotification>;
+    storageSummary = results[4] as StorageSummary;
+    preferences = results[5] as UserPreferences;
   }
 
   Future<void> _refreshAlbumsWithToken(
@@ -1155,7 +1275,26 @@ class AppController extends ChangeNotifier {
     groupInviteCodeController.dispose();
     albumNameController.dispose();
     albumSearchController.dispose();
+    profileNameController.dispose();
+    profileBioController.dispose();
     super.dispose();
+  }
+
+  void _replaceSessionUser(User user) {
+    final current = session;
+    if (current == null) {
+      return;
+    }
+    session = AuthSession(
+      accessToken: current.accessToken,
+      tokenType: current.tokenType,
+      user: user,
+    );
+  }
+
+  void _syncProfileControllers(User? user) {
+    profileNameController.text = user?.displayName ?? '';
+    profileBioController.text = user?.bio ?? '';
   }
 }
 

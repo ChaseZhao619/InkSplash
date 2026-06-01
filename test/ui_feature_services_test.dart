@@ -6,6 +6,8 @@ import 'package:http/testing.dart';
 import 'package:ink_splash/models.dart';
 import 'package:ink_splash/services/api_client.dart';
 import 'package:ink_splash/services/auth_service.dart';
+import 'package:ink_splash/services/device_service.dart';
+import 'package:ink_splash/services/profile_service.dart';
 
 void main() {
   test(
@@ -61,6 +63,20 @@ void main() {
       expect(prefs.deviceAlerts, isFalse);
       expect(prefs.sharingAlerts, isTrue);
       expect(prefs.profileVisibility, 'private');
+
+      final user = User.fromJson({
+        'user_id': 'usr_1',
+        'email': 'me@example.com',
+        'email_verified': true,
+        'display_name': 'Ink Keeper',
+        'avatar_url': 'https://example.com/avatar.png',
+        'bio': 'Family memories',
+        'updated_at': '2026-06-01T10:00:00Z',
+      });
+      expect(user.displayName, 'Ink Keeper');
+      expect(user.avatarUrl, 'https://example.com/avatar.png');
+      expect(user.bio, 'Family memories');
+      expect(user.preferredName, 'Ink Keeper');
     },
   );
 
@@ -97,5 +113,52 @@ void main() {
 
     expect(apple.accessToken, 'token');
     expect(google.user.emailVerified, isTrue);
+  });
+
+  test('profile update and virtual device services parse responses', () async {
+    final client = MockClient((request) async {
+      if (request.url.path == '/api/me/profile') {
+        return http.Response(
+          jsonEncode({
+            'user_id': 'usr_1',
+            'email': 'me@example.com',
+            'email_verified': true,
+            'display_name': 'Ink Keeper',
+            'bio': 'Warm memories',
+          }),
+          200,
+        );
+      }
+      if (request.url.path == '/api/me/devices/virtual') {
+        return http.Response(
+          jsonEncode({
+            'device_id': 'virtual_1',
+            'nickname': 'Test Frame',
+            'role': 'owner',
+            'last_status': 'virtual',
+          }),
+          200,
+        );
+      }
+      return http.Response('{}', 404);
+    });
+    final api = EpaperApiClient(
+      baseUrl: 'http://localhost',
+      httpClient: client,
+    );
+
+    final user = await ProfileService(api).updateProfile(
+      bearerToken: 'token',
+      displayName: 'Ink Keeper',
+      bio: 'Warm memories',
+    );
+    final device = await DeviceBindingService(
+      api,
+    ).createVirtualDevice(bearerToken: 'token');
+
+    expect(user.displayName, 'Ink Keeper');
+    expect(user.bio, 'Warm memories');
+    expect(device.deviceId, 'virtual_1');
+    expect(device.nickname, 'Test Frame');
   });
 }

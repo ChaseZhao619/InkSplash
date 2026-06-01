@@ -168,3 +168,47 @@ Storage response:
   "cleanup_suggestion": "Remove old previews to save space."
 }
 ```
+
+## Virtual Test Device
+
+The app exposes a testing tool for creating a cloud-backed virtual e-ink frame. This is used to validate upload, assign, timeline, status, and album flows without a physical ESP32 device.
+
+```http
+POST /api/me/devices/virtual
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+Request:
+
+```json
+{
+  "nickname": "Test Frame",
+  "profile": "six_color_eink"
+}
+```
+
+Response:
+
+```json
+{
+  "device_id": "virtual_abc123",
+  "nickname": "Test Frame",
+  "role": "owner",
+  "share_source": "owner",
+  "current_image_id": null,
+  "current_version": 0,
+  "last_status": "virtual",
+  "created_at": "2026-06-01T10:00:00Z",
+  "updated_at": "2026-06-01T10:00:00Z"
+}
+```
+
+Requirements:
+
+- Requires an authenticated user; server may require verified email if that is the production write policy.
+- Returned JSON must be compatible with `AppDevice`.
+- The virtual device should appear in `GET /api/me/devices`.
+- `POST /api/me/devices/{device_id}/assign` should work for virtual devices.
+- Assignment should increment `current_version`, update `current_image_id`, and create timeline/status events so the app can test the full UX.
+- Virtual devices must be clearly identified by `device_id` prefix or a backend-only type flag; they must never be used by real ESP32 polling tokens.

@@ -17,11 +17,13 @@ class ProfileService {
   Future<User> updateProfile({
     required String bearerToken,
     String? displayName,
+    String? bio,
+    String? avatarUrl,
   }) async {
     final json = await _api.patchJson(
       '/api/me/profile',
       bearerToken: bearerToken,
-      body: {'display_name': displayName},
+      body: {'display_name': displayName, 'bio': bio, 'avatar_url': avatarUrl},
     );
     return User.fromJson(json['user'] is Map ? _map(json['user']) : json);
   }

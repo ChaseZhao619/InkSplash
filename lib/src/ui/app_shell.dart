@@ -9,6 +9,7 @@ import '../localization/app_strings.dart';
 import '../settings/language_preference.dart';
 import '../state/app_controller.dart';
 import '../theme/ink_theme.dart';
+import 'time_format.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({
@@ -28,11 +29,13 @@ class _AppShellState extends State<AppShell> {
   late final AppController _controller;
   int _index = 0;
   bool _restored = false;
+  String? _lastMessage;
 
   @override
   void initState() {
     super.initState();
     _controller = AppController();
+    _controller.addListener(_showControllerMessage);
   }
 
   @override
@@ -46,8 +49,47 @@ class _AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
+    _controller.removeListener(_showControllerMessage);
     _controller.dispose();
     super.dispose();
+  }
+
+  void _showControllerMessage() {
+    final message = _controller.message;
+    if (message == null || message.isEmpty) {
+      _lastMessage = null;
+      return;
+    }
+    if (message == _lastMessage) {
+      return;
+    }
+    _lastMessage = message;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final colors = Theme.of(context).colorScheme;
+      final failed = message.contains('失败') || message.contains('failed');
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.fromLTRB(18, 0, 18, 20),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            backgroundColor: failed ? colors.errorContainer : colors.primary,
+            content: Text(
+              message,
+              style: TextStyle(
+                color: failed ? colors.onErrorContainer : colors.onPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        );
+    });
   }
 
   @override
@@ -62,8 +104,6 @@ class _AppShellState extends State<AppShell> {
             body: SafeArea(
               child: Column(
                 children: [
-                  if (_controller.message != null)
-                    _MessageBanner(message: _controller.message!),
                   if (_controller.busy) const LinearProgressIndicator(),
                   Expanded(
                     child: _AuthPage(
@@ -134,8 +174,6 @@ class _AppShellState extends State<AppShell> {
             child: SafeArea(
               child: Column(
                 children: [
-                  if (_controller.message != null)
-                    _MessageBanner(message: _controller.message!),
                   if (_controller.busy) const LinearProgressIndicator(),
                   Expanded(child: pages[_index]),
                 ],
@@ -658,7 +696,9 @@ class _TimelinePage extends StatelessWidget {
         else
           for (final event in controller.timelineEvents)
             _Panel(
-              title: event.createdAt ?? event.type,
+              title: formatLocalTime(event.createdAt).isEmpty
+                  ? event.type
+                  : formatLocalTime(event.createdAt),
               child: _TimelineEventTile(event: event),
             ),
       ],
@@ -684,13 +724,21 @@ class _SendPage extends StatelessWidget {
         _HeroPanel(
           title: s.isZh ? '编辑照片' : 'Edit Photo',
           subtitle: device == null
-              ? s.selectBindDeviceFirst
+              ? (s.isZh ? '可仅上传到相册' : 'Album upload available')
               : _deviceTitle(device),
           preview: controller.previewPng,
           emptyText: s.noPreview,
         ),
         _Panel(
-          title: s.isZh ? '01 选择设备' : '01 Select Device',
+          title: s.isZh ? '01 目标相册' : '01 Target Album',
+          action: IconButton(
+            onPressed: () => controller.refreshUiFeatures(s),
+            icon: const Icon(Icons.refresh),
+          ),
+          child: _AlbumTargetSelector(controller: controller),
+        ),
+        _Panel(
+          title: s.isZh ? '02 选择设备（可选）' : '02 Select Device (optional)',
           action: IconButton(
             onPressed: () => controller.refreshDevices(s),
             icon: const Icon(Icons.refresh),
@@ -737,7 +785,7 @@ class _SendPage extends StatelessWidget {
           ),
         ),
         _Panel(
-          title: s.isZh ? '02 编辑与适配' : '02 Edit & Fit',
+          title: s.isZh ? '03 编辑与适配' : '03 Edit & Fit',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -768,7 +816,9 @@ class _SendPage extends StatelessWidget {
                           ? null
                           : () => controller.uploadAndAssign(s),
                       icon: Icons.send_outlined,
-                      label: s.sendToFrame,
+                      label: device == null
+                          ? (s.isZh ? '上传到相册' : 'Upload to album')
+                          : s.sendToFrame,
                     ),
                   ),
                 ],
@@ -778,52 +828,6 @@ class _SendPage extends StatelessWidget {
         ),
         if (controller.latestImage != null)
           _ImageMetaPanel(image: controller.latestImage!),
-        if (controller.latestImage != null)
-          _Panel(
-            title: s.isZh ? '加入相册' : 'Add to album',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (controller.albums.isEmpty)
-                  _FeatureEmptyState(
-                    icon: Icons.photo_album_outlined,
-                    title: s.isZh ? '暂无相册可选' : 'No albums available',
-                    detail: controller.uiFeatureError,
-                  )
-                else
-                  DropdownButtonFormField<String>(
-                    initialValue: controller.selectedAlbum?.albumId,
-                    items: [
-                      for (final album in controller.albums)
-                        DropdownMenuItem(
-                          value: album.albumId,
-                          child: Text(
-                            album.title,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                    onChanged: (value) {
-                      if (value == null) return;
-                      controller.selectAlbum(
-                        controller.albums.firstWhere(
-                          (album) => album.albumId == value,
-                        ),
-                      );
-                    },
-                    decoration: InputDecoration(labelText: s.albums),
-                  ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: controller.albums.isEmpty
-                      ? null
-                      : () => controller.addLatestPhotoToSelectedAlbum(s),
-                  icon: const Icon(Icons.library_add_outlined),
-                  label: Text(s.isZh ? '加入相册' : 'Add to album'),
-                ),
-              ],
-            ),
-          ),
         _SendProgressPanel(controller: controller),
       ],
     );
@@ -844,10 +848,17 @@ class _MePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = AppStrings.of(context);
-    final email = controller.session?.user.email ?? 'emily@inksplash.com';
+    final user = controller.currentUser;
     return _PageScaffold(
       children: [
-        _ProfileHeader(email: email),
+        _ProfileHeader(
+          user: user,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => _ProfileEditPage(controller: controller),
+            ),
+          ),
+        ),
         _SettingsList(
           controller: controller,
           language: language,
@@ -885,6 +896,48 @@ class _MePage extends StatelessWidget {
   }
 }
 
+class _AlbumTargetSelector extends StatelessWidget {
+  const _AlbumTargetSelector({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    if (controller.albums.isEmpty) {
+      return _FeatureEmptyState(
+        icon: Icons.photo_album_outlined,
+        title: s.isZh ? '暂无相册可选' : 'No albums available',
+        detail: controller.uiFeatureError,
+      );
+    }
+    return DropdownButtonFormField<String>(
+      initialValue: controller.selectedAlbum?.albumId,
+      items: [
+        for (final album in controller.albums)
+          DropdownMenuItem(
+            value: album.albumId,
+            child: Text(album.title, overflow: TextOverflow.ellipsis),
+          ),
+      ],
+      onChanged: (value) {
+        if (value == null) {
+          return;
+        }
+        controller.selectAlbum(
+          controller.albums.firstWhere((album) => album.albumId == value),
+        );
+      },
+      decoration: InputDecoration(
+        labelText: s.albums,
+        helperText: s.isZh
+            ? '没有设备时也可以仅上传到相册。'
+            : 'You can upload to an album without a device.',
+      ),
+    );
+  }
+}
+
 class _DevicesPage extends StatelessWidget {
   const _DevicesPage({required this.controller});
 
@@ -916,6 +969,25 @@ class _DevicesPage extends StatelessWidget {
                       ),
                   ],
                 ),
+        ),
+        _Panel(
+          title: s.isZh ? '测试工具' : 'Testing tools',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                s.isZh
+                    ? '创建一台云端虚拟六色墨水屏，用于测试上传、下发、时间线和状态流程。'
+                    : 'Create a cloud virtual six-color e-ink frame for upload, assign, timeline, and status testing.',
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => controller.createVirtualDevice(s),
+                icon: const Icon(Icons.science_outlined),
+                label: Text(s.isZh ? '绑定虚拟测试设备' : 'Bind virtual test device'),
+              ),
+            ],
+          ),
         ),
         if (selected != null)
           _Panel(
@@ -965,14 +1037,14 @@ class _DevicesPage extends StatelessWidget {
                         InkIconTile(
                           icon: Icons.history,
                           title: event.status,
-                          subtitle: [
+                          subtitle: joinDetails([
                             if (event.version != null) 'v${event.version}',
                             if (event.error != null) event.error!,
                             if (event.batteryMv != null)
                               '${event.batteryMv} mV',
                             if (event.rssi != null) '${event.rssi} dBm',
-                            if (event.createdAt != null) event.createdAt!,
-                          ].join(' | '),
+                            formatLocalTime(event.createdAt),
+                          ], separator: ' | '),
                         ),
                     ],
                   ),
@@ -1354,37 +1426,36 @@ class _SettingsPage extends StatelessWidget {
 
     return _PageScaffold(
       children: [
+        _HeaderBlock(
+          icon: Icons.security_outlined,
+          title: s.isZh ? '账号与安全' : 'Account & security',
+          subtitle: s.isZh
+              ? '管理账号状态、验证、密码与连接。'
+              : 'Manage account status, verification, password, and connection.',
+        ),
         _Panel(
-          title: s.cloudAccount,
+          title: s.isZh ? '账号状态' : 'Account status',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                session == null
+              InkIconTile(
+                icon: Icons.person_outline,
+                title: session?.user.preferredName ?? s.notLoggedIn,
+                subtitle: session == null
                     ? s.notLoggedIn
                     : s.loggedInAs(
                         session.user.email,
                         session.user.emailVerified,
                       ),
+                dotColor: session?.user.emailVerified == true
+                    ? InkTheme.eInkBlue
+                    : InkTheme.eInkYellow,
               ),
-              const SizedBox(height: 12),
-              InkIconTile(
-                icon: Icons.lock_reset,
-                title: s.passwordReset,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => _BusyRoute(
-                      controller: controller,
-                      child: _PasswordResetPage(controller: controller),
-                    ),
-                  ),
+              if (session?.user.updatedAt != null)
+                _KeyValue(
+                  label: s.isZh ? '资料更新' : 'Profile updated',
+                  value: formatLocalTime(session!.user.updatedAt),
                 ),
-              ),
-              TextButton.icon(
-                onPressed: () => controller.logout(s),
-                icon: const Icon(Icons.logout),
-                label: Text(s.logout),
-              ),
             ],
           ),
         ),
@@ -1394,6 +1465,12 @@ class _SettingsPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Text(
+                  s.isZh
+                      ? '验证邮箱后可以使用设备绑定、上传和共享等写操作。'
+                      : 'Verify your email to use device binding, uploads, and sharing writes.',
+                ),
+                const SizedBox(height: 12),
                 OutlinedButton.icon(
                   onPressed: () => controller.requestEmailVerification(s),
                   icon: const Icon(Icons.mark_email_read_outlined),
@@ -1418,6 +1495,54 @@ class _SettingsPage extends StatelessWidget {
             ),
           ),
         _Panel(
+          title: s.isZh ? '密码安全' : 'Password security',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InkIconTile(
+                icon: Icons.lock_reset,
+                title: s.passwordReset,
+                subtitle: s.isZh ? '通过邮件验证码重设密码' : 'Reset with an email code',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => _BusyRoute(
+                      controller: controller,
+                      child: _PasswordResetPage(controller: controller),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        _Panel(
+          title: s.isZh ? '登录方式' : 'Sign-in methods',
+          child: Column(
+            children: [
+              InkIconTile(
+                icon: Icons.mail_outline,
+                title: s.isZh ? '邮箱密码' : 'Email and password',
+                subtitle: session?.user.email ?? s.notLoggedIn,
+                dotColor: InkTheme.eInkBlue,
+              ),
+              InkIconTile(
+                icon: Icons.apple,
+                title: 'Apple',
+                subtitle: s.isZh
+                    ? '通过 Apple 凭证登录'
+                    : 'Sign in with Apple token exchange',
+              ),
+              InkIconTile(
+                icon: Icons.g_mobiledata,
+                title: 'Google',
+                subtitle: s.isZh
+                    ? '通过 Google 凭证登录'
+                    : 'Sign in with Google token exchange',
+              ),
+            ],
+          ),
+        ),
+        _Panel(
           title: s.language,
           child: SegmentedButton<LanguagePreference>(
             segments: [
@@ -1440,12 +1565,23 @@ class _SettingsPage extends StatelessWidget {
           ),
         ),
         _Panel(
-          title: s.advanced,
-          child: InkTextField(
-            controller: controller.baseUrlController,
-            enabled: !controller.busy,
-            labelText: s.serverBaseUrl,
-            prefixIcon: Icons.cloud_outlined,
+          title: s.isZh ? '服务器连接' : 'Server connection',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InkTextField(
+                controller: controller.baseUrlController,
+                enabled: !controller.busy,
+                labelText: s.serverBaseUrl,
+                prefixIcon: Icons.cloud_outlined,
+              ),
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: () => controller.logout(s),
+                icon: const Icon(Icons.logout),
+                label: Text(s.logout),
+              ),
+            ],
           ),
         ),
       ],
@@ -1514,6 +1650,68 @@ class _PasswordResetPage extends StatelessWidget {
   }
 }
 
+class _ProfileEditPage extends StatelessWidget {
+  const _ProfileEditPage({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    final user = controller.currentUser;
+    return Scaffold(
+      appBar: AppBar(title: Text(s.isZh ? '编辑个人资料' : 'Edit profile')),
+      body: _PageScaffold(
+        children: [
+          _Panel(
+            title: s.isZh ? '个人信息' : 'Profile',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                InkIconTile(
+                  icon: Icons.alternate_email,
+                  title: user?.email ?? s.notLoggedIn,
+                  subtitle: user?.emailVerified == true
+                      ? (s.isZh ? '邮箱已验证' : 'Email verified')
+                      : (s.isZh ? '邮箱未验证' : 'Email unverified'),
+                  dotColor: user?.emailVerified == true
+                      ? InkTheme.eInkBlue
+                      : InkTheme.eInkYellow,
+                ),
+                const SizedBox(height: 12),
+                InkTextField(
+                  controller: controller.profileNameController,
+                  labelText: s.isZh ? '显示名称' : 'Display name',
+                  prefixIcon: Icons.badge_outlined,
+                ),
+                const SizedBox(height: 12),
+                InkTextField(
+                  controller: controller.profileBioController,
+                  labelText: s.isZh ? '简介' : 'Bio',
+                  prefixIcon: Icons.notes_outlined,
+                ),
+                if (user?.updatedAt != null) ...[
+                  const SizedBox(height: 10),
+                  _KeyValue(
+                    label: s.isZh ? '上次更新' : 'Last updated',
+                    value: formatLocalTime(user!.updatedAt),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                InkButton.primary(
+                  onPressed: () => controller.updateProfile(s),
+                  icon: Icons.save_outlined,
+                  label: s.isZh ? '保存资料' : 'Save profile',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _NotificationsPage extends StatelessWidget {
   const _NotificationsPage({required this.controller});
 
@@ -1546,10 +1744,10 @@ class _NotificationsPage extends StatelessWidget {
                               ? Icons.notifications_none
                               : Icons.notifications_active_outlined,
                           title: item.title,
-                          subtitle: [
+                          subtitle: joinDetails([
                             if (item.body != null) item.body!,
-                            if (item.createdAt != null) item.createdAt!,
-                          ].join(' · '),
+                            formatLocalTime(item.createdAt),
+                          ]),
                           dotColor: item.read ? null : InkTheme.eInkRed,
                           onTap: () => controller.markNotificationRead(s, item),
                         ),
@@ -1734,8 +1932,8 @@ class _InfoPage extends StatelessWidget {
             child: Text(
               about
                   ? (s.isZh
-                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.13。'
-                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.13.')
+                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.15。'
+                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.15.')
                   : (s.isZh
                         ? '如需反馈，请在 GitHub 项目中提交 issue，并附上设备型号、系统版本和问题截图。'
                         : 'For feedback, open a GitHub issue with your device model, OS version, and screenshots.'),
@@ -1888,15 +2086,6 @@ class _BusyRoute extends StatelessWidget {
                 top: 0,
                 right: 0,
                 child: LinearProgressIndicator(),
-              ),
-            if (controller.message != null)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: SafeArea(
-                  child: _MessageBanner(message: controller.message!),
-                ),
               ),
           ],
         );
@@ -2739,11 +2928,11 @@ class _DeviceSyncCard extends StatelessWidget {
 class _UpdateTile extends StatelessWidget {
   _UpdateTile.fromTimeline({required InkTimelineEvent item})
     : title = item.title,
-      subtitle = [
+      subtitle = joinDetails([
         if (item.subtitle != null) item.subtitle!,
         if (item.deviceId != null) item.deviceId!,
-        if (item.createdAt != null) item.createdAt!,
-      ].join(' · '),
+        formatLocalTime(item.createdAt),
+      ]),
       image = null,
       previewUrl = item.previewUrl,
       dotColor = _timelineColor(item.type);
@@ -2991,11 +3180,11 @@ class _TimelineEventTile extends StatelessWidget {
         _ => Icons.image_outlined,
       },
       title: event.title,
-      subtitle: [
+      subtitle: joinDetails([
         if (event.subtitle != null) event.subtitle!,
         if (event.deviceId != null) event.deviceId!,
         if (event.albumId != null) event.albumId!,
-      ].join(' · '),
+      ]),
       dotColor: _timelineColor(event.type),
       trailing: ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -3046,6 +3235,36 @@ class _AlbumDetailPage extends StatelessWidget {
           Text(
             '${album.photoCount} ${s.isZh ? '张照片' : 'photos'}'
             '${album.shared ? ' · ${s.familySharing}' : ''}',
+          ),
+          _Panel(
+            title: s.isZh ? '添加照片' : 'Add photos',
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkButton.secondary(
+                    onPressed: () {
+                      controller.selectAlbum(album);
+                      controller.chooseImage(s);
+                    },
+                    icon: Icons.add_photo_alternate_outlined,
+                    label: s.chooseImage,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: InkButton.primary(
+                    onPressed: controller.selectedImage == null
+                        ? null
+                        : () {
+                            controller.selectAlbum(album);
+                            controller.uploadToSelectedAlbum(s);
+                          },
+                    icon: Icons.cloud_upload_outlined,
+                    label: s.isZh ? '上传到相册' : 'Upload',
+                  ),
+                ),
+              ],
+            ),
           ),
           _MemberAvatarRow(controller: controller),
           _FilterChips(
@@ -3114,44 +3333,68 @@ class _ProgressStep extends StatelessWidget {
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.email});
+  const _ProfileHeader({required this.user, required this.onTap});
 
-  final String email;
+  final User? user;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final email = user?.email ?? 'account@inksplash.app';
+    final name = user?.preferredName ?? 'InkSplash';
+    final bio = user?.bio;
     return InkCard(
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: InkTheme.eInkBlue.withValues(alpha: 0.22),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: InkTheme.eInkBlue.withValues(alpha: 0.22),
+                ),
+              ),
+              child: CircleAvatar(
+                backgroundImage: user?.avatarUrl?.isNotEmpty == true
+                    ? NetworkImage(user!.avatarUrl!)
+                    : const AssetImage('assets/demo/avatar_emily.png')
+                          as ImageProvider,
+                radius: 30,
               ),
             ),
-            child: const CircleAvatar(
-              backgroundImage: AssetImage('assets/demo/avatar_emily.png'),
-              radius: 30,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(email, overflow: TextOverflow.ellipsis),
+                  if (bio != null && bio.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      bio,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Emily',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
-                ),
-                const SizedBox(height: 3),
-                Text(email, overflow: TextOverflow.ellipsis),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right),
-        ],
+            const Icon(Icons.chevron_right),
+          ],
+        ),
       ),
     );
   }
@@ -3248,7 +3491,7 @@ class _SettingsList extends StatelessWidget {
       _SettingsRow(
         Icons.info_outline,
         s.isZh ? '关于 InkSplash' : 'About InkSplash',
-        'v1.0.13',
+        'v1.0.15',
         () => Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => const _InfoPage(kind: _InfoPageKind.about),
@@ -3402,25 +3645,6 @@ class _StepHeader extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _MessageBanner extends StatelessWidget {
-  const _MessageBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-      child: Material(
-        color: colors.secondaryContainer.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(padding: const EdgeInsets.all(12), child: Text(message)),
       ),
     );
   }
