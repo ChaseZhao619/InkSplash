@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -26,9 +27,11 @@ class EpaperApiClient {
     String? bearerToken,
     Map<String, String>? headers,
   }) async {
-    final response = await _httpClient.get(
-      resolve(path),
-      headers: _headers(bearerToken: bearerToken, extra: headers),
+    final response = await _networkRetry(
+      () => _httpClient.get(
+        resolve(path),
+        headers: _headers(bearerToken: bearerToken, extra: headers),
+      ),
     );
     return _decodeObject(response);
   }
@@ -39,13 +42,16 @@ class EpaperApiClient {
     String? bearerToken,
     Map<String, String>? headers,
   }) async {
-    final response = await _httpClient.post(
-      resolve(path),
-      headers: _headers(
-        bearerToken: bearerToken,
-        extra: {'Content-Type': 'application/json', ...?headers},
+    final encodedBody = jsonEncode(body ?? const {});
+    final response = await _networkRetry(
+      () => _httpClient.post(
+        resolve(path),
+        headers: _headers(
+          bearerToken: bearerToken,
+          extra: {'Content-Type': 'application/json', ...?headers},
+        ),
+        body: encodedBody,
       ),
-      body: jsonEncode(body ?? const {}),
     );
     return _decodeObject(response);
   }
@@ -54,9 +60,11 @@ class EpaperApiClient {
     String path, {
     String? bearerToken,
   }) async {
-    final response = await _httpClient.delete(
-      resolve(path),
-      headers: _headers(bearerToken: bearerToken),
+    final response = await _networkRetry(
+      () => _httpClient.delete(
+        resolve(path),
+        headers: _headers(bearerToken: bearerToken),
+      ),
     );
     return _decodeObject(response);
   }
@@ -67,13 +75,16 @@ class EpaperApiClient {
     String? bearerToken,
     Map<String, String>? headers,
   }) async {
-    final response = await _httpClient.patch(
-      resolve(path),
-      headers: _headers(
-        bearerToken: bearerToken,
-        extra: {'Content-Type': 'application/json', ...?headers},
+    final encodedBody = jsonEncode(body ?? const {});
+    final response = await _networkRetry(
+      () => _httpClient.patch(
+        resolve(path),
+        headers: _headers(
+          bearerToken: bearerToken,
+          extra: {'Content-Type': 'application/json', ...?headers},
+        ),
+        body: encodedBody,
       ),
-      body: jsonEncode(body ?? const {}),
     );
     return _decodeObject(response);
   }
@@ -86,21 +97,29 @@ class EpaperApiClient {
     String? bearerToken,
     Map<String, String>? headers,
   }) async {
-    final request = http.MultipartRequest('POST', resolve(path))
-      ..headers.addAll(_headers(bearerToken: bearerToken, extra: headers))
-      ..fields.addAll(fields)
-      ..files.add(
-        await http.MultipartFile.fromPath('file', filePath, filename: fileName),
-      );
-    final streamed = await request.send();
-    final response = await http.Response.fromStream(streamed);
+    final response = await _networkRetry(() async {
+      final request = http.MultipartRequest('POST', resolve(path))
+        ..headers.addAll(_headers(bearerToken: bearerToken, extra: headers))
+        ..fields.addAll(fields)
+        ..files.add(
+          await http.MultipartFile.fromPath(
+            'file',
+            filePath,
+            filename: fileName,
+          ),
+        );
+      final streamed = await request.send();
+      return http.Response.fromStream(streamed);
+    });
     return _decodeObject(response);
   }
 
   Future<List<int>> getBytes(String pathOrUrl, {String? bearerToken}) async {
-    final response = await _httpClient.get(
-      resolve(pathOrUrl),
-      headers: _headers(bearerToken: bearerToken),
+    final response = await _networkRetry(
+      () => _httpClient.get(
+        resolve(pathOrUrl),
+        headers: _headers(bearerToken: bearerToken),
+      ),
     );
     _ensureSuccess(response);
     return response.bodyBytes;
@@ -113,8 +132,33 @@ class EpaperApiClient {
     return {
       if (bearerToken != null && bearerToken.isNotEmpty)
         'Authorization': 'Bearer $bearerToken',
+      'Accept': 'application/json',
+      'Connection': 'close',
       ...?extra,
     };
+  }
+
+  Future<T> _networkRetry<T>(Future<T> Function() request) async {
+    try {
+      return await request().timeout(const Duration(seconds: 30));
+    } on http.ClientException catch (error) {
+      if (!_shouldRetryNetworkError(error.message)) {
+        rethrow;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      return request().timeout(const Duration(seconds: 30));
+    } on SocketException {
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      return request().timeout(const Duration(seconds: 30));
+    }
+  }
+
+  bool _shouldRetryNetworkError(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('connection abort') ||
+        normalized.contains('connection reset') ||
+        normalized.contains('connection closed') ||
+        normalized.contains('broken pipe');
   }
 
   Map<String, dynamic> _decodeObject(http.Response response) {
