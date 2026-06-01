@@ -90,6 +90,8 @@ class AppController extends ChangeNotifier {
   String? uiFeatureError;
   String timelineRange = 'all';
 
+  static const _googleServerClientId =
+      '21000885315-r2b3c1ea0jq6aiurvturrt4sg323pjic.apps.googleusercontent.com';
   static Future<void>? _googleInitialization;
 
   EpaperApiClient get _api => EpaperApiClient(baseUrl: baseUrlController.text);
@@ -229,7 +231,9 @@ class AppController extends ChangeNotifier {
   Future<void> loginWithGoogle(AppStrings s) async {
     await runAction(s, s.isZh ? 'Google 登录' : 'Google sign in', () async {
       final google = GoogleSignIn.instance;
-      _googleInitialization ??= google.initialize();
+      _googleInitialization ??= google.initialize(
+        serverClientId: _googleServerClientId,
+      );
       await _googleInitialization;
       if (!google.supportsAuthenticate()) {
         throw ApiError(
