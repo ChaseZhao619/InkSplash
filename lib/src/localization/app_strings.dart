@@ -189,9 +189,56 @@ class AppStrings {
   String get invalidClaimCodeHelp => isZh
       ? '设备绑定码无效或设备已被绑定。请确认二维码里的 device_id 和 claim_code 来自同一台设备，且服务端使用了正确的 DEVICE_CLAIM_HMAC_SECRET。'
       : 'Device claim code is invalid or the device is already bound. Confirm the QR device_id and claim_code come from the same device and the server uses the correct DEVICE_CLAIM_HMAC_SECRET.';
+  String get provisioningPermissionDenied => isZh
+      ? '请允许蓝牙、定位或附近设备权限后再搜索设备。'
+      : 'Allow Bluetooth, location, or nearby device permissions before searching.';
+  String get noProvisioningDevicesFound => isZh
+      ? '附近没有找到待配网设备。请确认设备已开机并处于配网模式。'
+      : 'No provisioning device found nearby. Make sure the device is powered on and in provisioning mode.';
+  String get provisioningSearchTimeout => isZh
+      ? '搜索设备超时。请靠近设备后重试。'
+      : 'Device search timed out. Move closer to the device and try again.';
+  String get searchingDevices =>
+      isZh ? '正在搜索附近设备...' : 'Searching nearby devices...';
+  String get contentTemporarilyUnavailable => isZh
+      ? '内容暂时无法加载，请稍后刷新。'
+      : 'Content is temporarily unavailable. Refresh again later.';
+  String get previewReady =>
+      isZh ? '预览已生成，可以确认后下发。' : 'Preview ready. Review it before sending.';
   String completed(String action) => isZh ? '$action 已完成' : '$action completed';
-  String failed(String action, Object error) =>
-      isZh ? '$action 失败：$error' : '$action failed: $error';
+  String failed(String action, Object error) {
+    final detail = _friendlyError(error);
+    return isZh ? '$action 失败：$detail' : '$action failed: $detail';
+  }
+
+  String _friendlyError(Object error) {
+    final raw = '$error';
+    final normalized = raw.toLowerCase();
+    if (normalized.contains('timeoutexception') ||
+        normalized.contains('future not completed') ||
+        normalized.contains('timed out')) {
+      return isZh ? '网络连接超时，请稍后重试。' : 'Network timed out. Try again later.';
+    }
+    if (normalized.contains('clientexception') ||
+        normalized.contains('connection abort') ||
+        normalized.contains('connection reset') ||
+        normalized.contains('broken pipe')) {
+      return isZh
+          ? '网络连接中断，请检查网络后重试。'
+          : 'Network connection was interrupted. Check your connection and try again.';
+    }
+    if (normalized.contains('http 401') ||
+        normalized.contains('unauthorized') ||
+        normalized.contains('invalid oauth')) {
+      return isZh
+          ? '登录凭证无效，请重新登录。'
+          : 'Sign-in credential is invalid. Sign in again.';
+    }
+    return raw
+        .replaceFirst(RegExp(r'^[A-Za-z]+Exception:\s*'), '')
+        .replaceFirst(RegExp(r'^ApiError:\s*'), '');
+  }
+
   String get loginAction => isZh ? '登录' : 'Login';
   String get registerAction => isZh ? '注册' : 'Register';
   String get logoutAction => isZh ? '退出登录' : 'Logout';

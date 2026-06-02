@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -605,13 +606,27 @@ class AppController extends ChangeNotifier {
       s,
       payload.isSoftAp ? s.softApSearchAction : s.bleSearchAction,
       () async {
-        await _provisioning.requestPermissions();
-        provisioningDevices = payload.isSoftAp
-            ? await _provisioning.searchSoftApDevices(
+        final granted = await _provisioning.requestPermissions();
+        if (!granted) {
+          throw ApiError(s.provisioningPermissionDenied);
+        }
+        final search = payload.isSoftAp
+            ? _provisioning.searchSoftApDevices(
                 prefix: payload.devicePrefix,
                 name: payload.name,
               )
-            : await _provisioning.searchBleDevices(payload.devicePrefix);
+            : _provisioning.searchBleDevices(payload.devicePrefix);
+        final devices = await search.timeout(
+          const Duration(seconds: 18),
+          onTimeout: () => throw TimeoutException(
+            s.provisioningSearchTimeout,
+            const Duration(seconds: 18),
+          ),
+        );
+        provisioningDevices = devices;
+        if (devices.isEmpty) {
+          throw ApiError(s.noProvisioningDevicesFound);
+        }
       },
     );
   }

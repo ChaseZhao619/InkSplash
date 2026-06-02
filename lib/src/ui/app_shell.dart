@@ -141,7 +141,7 @@ class _AppShellState extends State<AppShell> {
             title: Row(
               children: [
                 Image.asset(
-                  'UI/logo.png',
+                  'UI/image.png',
                   width: 34,
                   height: 34,
                   fit: BoxFit.contain,
@@ -1467,6 +1467,20 @@ class _AddDevicePage extends StatelessWidget {
                     payload.isSoftAp ? s.searchSoftApDevice : s.searchBleDevice,
                   ),
                 ),
+                if (controller.busy) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(s.searchingDevices)),
+                    ],
+                  ),
+                ],
               ],
               for (final device in controller.provisioningDevices)
                 InkIconTile(
@@ -2046,8 +2060,8 @@ class _InfoPage extends StatelessWidget {
             child: Text(
               about
                   ? (s.isZh
-                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.19。'
-                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.19.')
+                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.20。'
+                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.20.')
                   : (s.isZh
                         ? '如需反馈，请在 GitHub 项目中提交 issue，并附上设备型号、系统版本和问题截图。'
                         : 'For feedback, open a GitHub issue with your device model, OS version, and screenshots.'),
@@ -2609,7 +2623,7 @@ class _AuthBrandHero extends StatelessWidget {
       children: [
         Row(
           children: [
-            Image.asset('UI/logo.png', width: 58, height: 58),
+            Image.asset('UI/image.png', width: 58, height: 58),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -3129,11 +3143,13 @@ class _FeatureEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return _EmptyState(
       icon: icon,
       text: [
         title,
-        if (detail != null && detail!.isNotEmpty) detail!,
+        if (detail != null && detail!.isNotEmpty)
+          s.contentTemporarilyUnavailable,
       ].join('\n'),
     );
   }
@@ -3605,7 +3621,7 @@ class _SettingsList extends StatelessWidget {
       _SettingsRow(
         Icons.info_outline,
         s.isZh ? '关于 InkSplash' : 'About InkSplash',
-        'v1.0.19',
+        'v1.0.20',
         () => Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => const _InfoPage(kind: _InfoPageKind.about),
@@ -3684,12 +3700,15 @@ class _ImageMetaPanel extends StatelessWidget {
     return _Panel(
       title: s.latestImage,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _KeyValue(label: s.imageId, value: image.imageId),
-          _KeyValue(label: s.size, value: '${image.width} x ${image.height}'),
-          _KeyValue(label: s.data, value: '${image.dataSize} bytes'),
-          _KeyValue(label: s.format, value: image.format),
-          _KeyValue(label: s.sha256, value: image.sha256),
+          InkIconTile(
+            icon: Icons.check_circle_outline,
+            title: s.previewReady,
+            subtitle:
+                '${image.width} x ${image.height} · ${image.format.toUpperCase()}',
+            dotColor: InkTheme.eInkBlue,
+          ),
         ],
       ),
     );
@@ -3804,6 +3823,7 @@ class _KeyValue extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
@@ -3816,7 +3836,17 @@ class _KeyValue extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
-          Expanded(child: SelectableText(value)),
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colors.onSurface.withValues(alpha: 0.72),
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
         ],
       ),
     );

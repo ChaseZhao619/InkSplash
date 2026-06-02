@@ -126,9 +126,29 @@ class MainActivity : FlutterActivity() {
             ESPConstants.TransportType.TRANSPORT_BLE,
             ESPConstants.SecurityType.SECURITY_1
         )
+        var completed = false
+        val timeout = Runnable {
+            if (!completed) {
+                completed = true
+                result.success(scannedBleDevicePayload())
+            }
+        }
+        handler.postDelayed(timeout, 12000)
+        fun completeSuccess() {
+            if (completed) return
+            completed = true
+            handler.removeCallbacks(timeout)
+            result.success(scannedBleDevicePayload())
+        }
+        fun completeError(code: String, message: String) {
+            if (completed) return
+            completed = true
+            handler.removeCallbacks(timeout)
+            result.error(code, message, null)
+        }
         provisionManager.searchBleEspDevices(prefix, object : BleScanListener {
             override fun scanStartFailed() {
-                result.error("scan_start_failed", "Bluetooth scan could not start", null)
+                completeError("scan_start_failed", "Bluetooth scan could not start")
             }
 
             override fun onPeripheralFound(device: BluetoothDevice, scanResult: ScanResult) {
@@ -139,20 +159,23 @@ class MainActivity : FlutterActivity() {
             }
 
             override fun scanCompleted() {
-                val devices = scannedDevices.map { (name, scanned) ->
-                    mapOf(
-                        "name" to name,
-                        "serviceUuid" to scanned.serviceUuid,
-                        "rssi" to scanned.rssi
-                    )
-                }
-                result.success(devices)
+                completeSuccess()
             }
 
             override fun onFailure(e: Exception) {
-                result.error("scan_failed", e.message ?: "Bluetooth scan failed", null)
+                completeError("scan_failed", e.message ?: "Bluetooth scan failed")
             }
         })
+    }
+
+    private fun scannedBleDevicePayload(): List<Map<String, Any?>> {
+        return scannedDevices.map { (name, scanned) ->
+            mapOf(
+                "name" to name,
+                "serviceUuid" to scanned.serviceUuid,
+                "rssi" to scanned.rssi
+            )
+        }
     }
 
     private fun connectBleDevice(call: MethodCall, result: MethodChannel.Result) {
@@ -187,6 +210,26 @@ class MainActivity : FlutterActivity() {
             ESPConstants.TransportType.TRANSPORT_SOFTAP,
             ESPConstants.SecurityType.SECURITY_1
         )
+        var completed = false
+        val timeout = Runnable {
+            if (!completed) {
+                completed = true
+                result.success(scannedSoftApDevicePayload(expectedName))
+            }
+        }
+        handler.postDelayed(timeout, 12000)
+        fun completeSuccess() {
+            if (completed) return
+            completed = true
+            handler.removeCallbacks(timeout)
+            result.success(scannedSoftApDevicePayload(expectedName))
+        }
+        fun completeError(code: String, message: String) {
+            if (completed) return
+            completed = true
+            handler.removeCallbacks(timeout)
+            result.error(code, message, null)
+        }
         provisionManager.searchWiFiEspDevices(prefix, object : WiFiScanListener {
             override fun onWifiListReceived(wifiList: ArrayList<WiFiAccessPoint>) {
                 wifiList.forEach { accessPoint ->
@@ -194,32 +237,34 @@ class MainActivity : FlutterActivity() {
                         scannedSoftApDevices[accessPoint.wifiName] = accessPoint
                     }
                 }
-                if (scannedSoftApDevices.isEmpty() && expectedName.isNotBlank()) {
-                    result.success(listOf(
-                        mapOf(
-                            "name" to expectedName,
-                            "serviceUuid" to "",
-                            "rssi" to null,
-                            "security" to null
-                        )
-                    ))
-                    return
-                }
-                val devices = scannedSoftApDevices.map { (name, accessPoint) ->
-                    mapOf(
-                        "name" to name,
-                        "serviceUuid" to "",
-                        "rssi" to accessPoint.rssi,
-                        "security" to accessPoint.security
-                    )
-                }
-                result.success(devices)
+                completeSuccess()
             }
 
             override fun onWiFiScanFailed(e: Exception) {
-                result.error("softap_scan_failed", e.message ?: "SoftAP scan failed", null)
+                completeError("softap_scan_failed", e.message ?: "SoftAP scan failed")
             }
         })
+    }
+
+    private fun scannedSoftApDevicePayload(expectedName: String): List<Map<String, Any?>> {
+        if (scannedSoftApDevices.isEmpty() && expectedName.isNotBlank()) {
+            return listOf(
+                mapOf(
+                    "name" to expectedName,
+                    "serviceUuid" to "",
+                    "rssi" to null,
+                    "security" to null
+                )
+            )
+        }
+        return scannedSoftApDevices.map { (name, accessPoint) ->
+            mapOf(
+                "name" to name,
+                "serviceUuid" to "",
+                "rssi" to accessPoint.rssi,
+                "security" to accessPoint.security
+            )
+        }
     }
 
     private fun connectSoftApDevice(call: MethodCall, result: MethodChannel.Result) {
