@@ -23,6 +23,19 @@ void main() {
     expect(payload.softApPassword, '12345678');
   });
 
+  test('parses provisioning QR from url data query', () {
+    final encoded = Uri.encodeComponent(
+      '{"ver":"v1","name":"PROV_C36AD8","transport":"ble","security":1,"pop":"abcd1234","device_id":"esp32_001","claim_code":"f095c9b448d55c929615763b09f54fef"}',
+    );
+    final payload = ProvisioningQrPayload.fromRaw(
+      'https://inksplash.app/provision?data=$encoded',
+    );
+
+    expect(payload.isBle, isTrue);
+    expect(payload.name, 'PROV_C36AD8');
+    expect(payload.deviceId, 'esp32_001');
+  });
+
   test('rejects unsupported provisioning transport', () {
     expect(
       () => ProvisioningQrPayload.fromRaw(

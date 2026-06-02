@@ -133,8 +133,15 @@ class ProvisioningQrPayload {
 
   factory ProvisioningQrPayload.fromRaw(String raw) {
     var normalized = raw.trim();
-    if (normalized.startsWith('data=')) {
+    final uri = Uri.tryParse(normalized);
+    final queryData = uri?.queryParameters['data'];
+    if (queryData != null && queryData.trim().isNotEmpty) {
+      normalized = queryData.trim();
+    } else if (normalized.startsWith('data=')) {
       normalized = normalized.substring(5).trim();
+    }
+    if (normalized.contains('%7B') || normalized.contains('%22')) {
+      normalized = Uri.decodeComponent(normalized);
     }
     final Object? decoded;
     try {

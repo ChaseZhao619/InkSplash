@@ -592,7 +592,7 @@ class AppController extends ChangeNotifier {
       provisioningDevices = const [];
       wifiNetworks = const [];
       selectedWifi = null;
-      message = null;
+      message = s.completed(s.scanDeviceQr);
     } catch (error) {
       final detail = error is FormatException ? error.message : '$error';
       message = '${s.invalidQrPayload}: $detail';
