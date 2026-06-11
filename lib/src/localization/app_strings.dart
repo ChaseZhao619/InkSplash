@@ -195,6 +195,9 @@ class AppStrings {
   String get noProvisioningDevicesFound => isZh
       ? '附近没有找到待配网设备。请确认设备已开机并处于配网模式。'
       : 'No provisioning device found nearby. Make sure the device is powered on and in provisioning mode.';
+  String get softApManualFallback => isZh
+      ? '未从 Wi-Fi 扫描中发现；可先在系统 Wi-Fi 连接该热点，再点这里继续。'
+      : 'Not found in Wi-Fi scan; connect to this hotspot in system Wi-Fi first, then tap here to continue.';
   String get provisioningSearchTimeout => isZh
       ? '搜索设备超时。请靠近设备后重试。'
       : 'Device search timed out. Move closer to the device and try again.';

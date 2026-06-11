@@ -1406,148 +1406,159 @@ class _AddDevicePage extends StatelessWidget {
       builder: (context, _) {
         final s = AppStrings.of(context);
         final payload = controller.qrPayload;
+        final media = MediaQuery.of(context);
 
-        return _PageScaffold(
-          children: [
-            _Panel(
-              title: s.provisionBind,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  FilledButton.icon(
-                    onPressed: () async {
-                      final raw = await Navigator.of(context).push<String>(
-                        MaterialPageRoute(
-                          builder: (_) => const QrScannerPage(),
-                        ),
-                      );
-                      if (raw != null && raw.isNotEmpty && context.mounted) {
-                        controller.applyQrPayload(s, raw);
-                      }
-                    },
-                    icon: const Icon(Icons.qr_code_scanner),
-                    label: Text(s.scanDeviceQr),
-                  ),
-                  if (payload == null) ...[
-                    const SizedBox(height: 18),
-                    _EmptyState(
-                      icon: Icons.qr_code_2_outlined,
-                      text: s.isZh
-                          ? '扫描设备二维码后，这里会显示设备信息和搜索入口。'
-                          : 'After scanning the device QR code, device details and search actions will appear here.',
+        return MediaQuery(
+          data: media.copyWith(
+            textScaler: media.textScaler.clamp(maxScaleFactor: 1.15),
+          ),
+          child: _PageScaffold(
+            children: [
+              _Panel(
+                title: s.provisionBind,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: () async {
+                        final raw = await Navigator.of(context).push<String>(
+                          MaterialPageRoute(
+                            builder: (_) => const QrScannerPage(),
+                          ),
+                        );
+                        if (raw != null && raw.isNotEmpty && context.mounted) {
+                          controller.applyQrPayload(s, raw);
+                        }
+                      },
+                      icon: const Icon(Icons.qr_code_scanner),
+                      label: Text(s.scanDeviceQr),
                     ),
-                  ] else ...[
-                    const SizedBox(height: 16),
-                    _StepHeader(index: 1, text: s.scanDeviceQr),
-                    _KeyValue(
-                      label: payload.isSoftAp ? s.softApName : s.bleName,
-                      value: payload.name,
-                    ),
-                    _KeyValue(label: s.deviceId, value: payload.deviceId),
-                    _KeyValue(label: s.transport, value: payload.transport),
-                    const SizedBox(height: 12),
-                    InkTextField(
-                      controller: controller.deviceNicknameController,
-                      labelText: s.nickname,
-                      prefixIcon: Icons.edit_outlined,
-                    ),
-                    const SizedBox(height: 16),
-                    _StepHeader(
-                      index: 2,
-                      text: payload.isSoftAp
-                          ? s.searchSoftApDevice
-                          : s.searchBleDevice,
-                    ),
-                    if (payload.isSoftAp) ...[
-                      Text(s.softApHint),
-                      const SizedBox(height: 10),
+                    if (payload == null) ...[
+                      const SizedBox(height: 18),
+                      _EmptyState(
+                        icon: Icons.qr_code_2_outlined,
+                        text: s.isZh
+                            ? '扫描设备二维码后，这里会显示设备信息和搜索入口。'
+                            : 'After scanning the device QR code, device details and search actions will appear here.',
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 16),
+                      _StepHeader(index: 1, text: s.scanDeviceQr),
+                      _KeyValue(
+                        label: payload.isSoftAp ? s.softApName : s.bleName,
+                        value: payload.name,
+                      ),
+                      _KeyValue(label: s.deviceId, value: payload.deviceId),
+                      _KeyValue(label: s.transport, value: payload.transport),
+                      const SizedBox(height: 12),
                       InkTextField(
-                        controller: controller.softApPasswordController,
-                        obscureText: true,
-                        labelText: s.softApPassword,
-                        helperText: s.softApPasswordHelp,
-                        prefixIcon: Icons.wifi_password_outlined,
+                        controller: controller.deviceNicknameController,
+                        labelText: s.nickname,
+                        prefixIcon: Icons.edit_outlined,
                       ),
-                      const SizedBox(height: 10),
-                    ],
-                    OutlinedButton.icon(
-                      onPressed: () => controller.searchProvisioningDevice(s),
-                      icon: Icon(
-                        payload.isSoftAp
-                            ? Icons.wifi_tethering
-                            : Icons.bluetooth_searching,
-                      ),
-                      label: Text(
-                        payload.isSoftAp
+                      const SizedBox(height: 16),
+                      _StepHeader(
+                        index: 2,
+                        text: payload.isSoftAp
                             ? s.searchSoftApDevice
                             : s.searchBleDevice,
                       ),
-                    ),
-                    if (controller.busy) ...[
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(child: Text(s.searchingDevices)),
+                      if (payload.isSoftAp) ...[
+                        Text(
+                          s.softApHint,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 10),
+                        InkTextField(
+                          controller: controller.softApPasswordController,
+                          obscureText: true,
+                          labelText: s.softApPassword,
+                          helperText: s.softApPasswordHelp,
+                          prefixIcon: Icons.wifi_password_outlined,
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      OutlinedButton.icon(
+                        onPressed: () => controller.searchProvisioningDevice(s),
+                        icon: Icon(
+                          payload.isSoftAp
+                              ? Icons.wifi_tethering
+                              : Icons.bluetooth_searching,
+                        ),
+                        label: Text(
+                          payload.isSoftAp
+                              ? s.searchSoftApDevice
+                              : s.searchBleDevice,
+                        ),
+                      ),
+                      if (controller.busy) ...[
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(s.searchingDevices)),
+                          ],
+                        ),
+                      ],
+                    ],
+                    for (final device in controller.provisioningDevices) ...[
+                      const SizedBox(height: 8),
+                      InkIconTile(
+                        icon: payload?.isSoftAp == true
+                            ? Icons.wifi
+                            : Icons.bluetooth,
+                        title: device.name,
+                        subtitle: device.serviceUuid ?? s.noServiceUuid,
+                        trailing: IconButton(
+                          icon: const Icon(Icons.link),
+                          tooltip: s.connect,
+                          onPressed: () =>
+                              controller.connectProvisioningDevice(s, device),
+                        ),
+                      ),
+                    ],
+                    if (controller.wifiNetworks.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _StepHeader(index: 3, text: s.wifiNetwork),
+                      DropdownButtonFormField<WifiNetwork>(
+                        initialValue: controller.selectedWifi,
+                        items: [
+                          for (final network in controller.wifiNetworks)
+                            DropdownMenuItem(
+                              value: network,
+                              child: Text(
+                                '${network.ssid}${network.rssi == null ? '' : ' (${network.rssi} dBm)'}',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                         ],
+                        onChanged: controller.selectWifi,
+                        decoration: InputDecoration(labelText: s.wifiNetwork),
+                      ),
+                      const SizedBox(height: 10),
+                      InkTextField(
+                        controller: controller.wifiPasswordController,
+                        obscureText: true,
+                        labelText: s.wifiPassword,
+                        prefixIcon: Icons.lock_outline,
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: () => controller.provisionAndClaim(s),
+                        icon: const Icon(Icons.done),
+                        label: Text(s.provisionWifiBind),
                       ),
                     ],
                   ],
-                  for (final device in controller.provisioningDevices)
-                    InkIconTile(
-                      icon: payload?.isSoftAp == true
-                          ? Icons.wifi
-                          : Icons.bluetooth,
-                      title: device.name,
-                      subtitle: device.serviceUuid ?? s.noServiceUuid,
-                      trailing: IconButton(
-                        icon: const Icon(Icons.link),
-                        tooltip: s.connect,
-                        onPressed: () =>
-                            controller.connectProvisioningDevice(s, device),
-                      ),
-                    ),
-                  if (controller.wifiNetworks.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    _StepHeader(index: 3, text: s.wifiNetwork),
-                    DropdownButtonFormField<WifiNetwork>(
-                      initialValue: controller.selectedWifi,
-                      items: [
-                        for (final network in controller.wifiNetworks)
-                          DropdownMenuItem(
-                            value: network,
-                            child: Text(
-                              '${network.ssid}${network.rssi == null ? '' : ' (${network.rssi} dBm)'}',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                      ],
-                      onChanged: controller.selectWifi,
-                      decoration: InputDecoration(labelText: s.wifiNetwork),
-                    ),
-                    const SizedBox(height: 10),
-                    InkTextField(
-                      controller: controller.wifiPasswordController,
-                      obscureText: true,
-                      labelText: s.wifiPassword,
-                      prefixIcon: Icons.lock_outline,
-                    ),
-                    const SizedBox(height: 16),
-                    FilledButton.icon(
-                      onPressed: () => controller.provisionAndClaim(s),
-                      icon: const Icon(Icons.done),
-                      label: Text(s.provisionWifiBind),
-                    ),
-                  ],
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -2078,8 +2089,8 @@ class _InfoPage extends StatelessWidget {
             child: Text(
               about
                   ? (s.isZh
-                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.22。'
-                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.22.')
+                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.23。'
+                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.23.')
                   : (s.isZh
                         ? '如需反馈，请在 GitHub 项目中提交 issue，并附上设备型号、系统版本和问题截图。'
                         : 'For feedback, open a GitHub issue with your device model, OS version, and screenshots.'),
@@ -3646,7 +3657,7 @@ class _SettingsList extends StatelessWidget {
       _SettingsRow(
         Icons.info_outline,
         s.isZh ? '关于 InkSplash' : 'About InkSplash',
-        'v1.0.22',
+        'v1.0.23',
         () => Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => const _InfoPage(kind: _InfoPageKind.about),
@@ -3803,7 +3814,10 @@ class _StepHeader extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -3855,12 +3869,18 @@ class _KeyValue extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 96,
+            width: 112,
             child: Text(
               label,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               value,

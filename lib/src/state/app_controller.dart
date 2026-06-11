@@ -610,24 +610,46 @@ class AppController extends ChangeNotifier {
         if (!granted) {
           throw ApiError(s.provisioningPermissionDenied);
         }
-        final search = payload.isSoftAp
-            ? _provisioning.searchSoftApDevices(
-                prefix: payload.devicePrefix,
-                name: payload.name,
-              )
-            : _provisioning.searchBleDevices(payload.devicePrefix);
-        final devices = await search.timeout(
-          const Duration(seconds: 18),
-          onTimeout: () => throw TimeoutException(
-            s.provisioningSearchTimeout,
+        List<ProvisioningDevice> devices;
+        try {
+          final search = payload.isSoftAp
+              ? _provisioning.searchSoftApDevices(
+                  prefix: payload.devicePrefix,
+                  name: payload.name,
+                )
+              : _provisioning.searchBleDevices(payload.devicePrefix);
+          devices = await search.timeout(
             const Duration(seconds: 18),
-          ),
-        );
+            onTimeout: () => throw TimeoutException(
+              s.provisioningSearchTimeout,
+              const Duration(seconds: 18),
+            ),
+          );
+        } catch (_) {
+          if (!payload.isSoftAp) {
+            rethrow;
+          }
+          devices = [_softApFallbackDevice(s, payload)];
+        }
         provisioningDevices = devices;
         if (devices.isEmpty) {
+          if (payload.isSoftAp) {
+            provisioningDevices = [_softApFallbackDevice(s, payload)];
+            return;
+          }
           throw ApiError(s.noProvisioningDevicesFound);
         }
       },
+    );
+  }
+
+  ProvisioningDevice _softApFallbackDevice(
+    AppStrings s,
+    ProvisioningQrPayload payload,
+  ) {
+    return ProvisioningDevice(
+      name: payload.name,
+      serviceUuid: s.softApManualFallback,
     );
   }
 
