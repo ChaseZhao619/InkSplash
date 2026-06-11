@@ -1496,6 +1496,17 @@ class _AddDevicePage extends StatelessWidget {
                           prefixIcon: Icons.wifi_password_outlined,
                         ),
                         const SizedBox(height: 10),
+                        FilledButton.icon(
+                          onPressed: () =>
+                              controller.connectScannedSoftApDevice(s),
+                          icon: const Icon(Icons.link),
+                          label: Text(
+                            s.isZh
+                                ? '连接 ${payload.name}'
+                                : 'Connect ${payload.name}',
+                          ),
+                        ),
+                        const SizedBox(height: 10),
                       ],
                       OutlinedButton.icon(
                         onPressed: () => controller.searchProvisioningDevice(s),
@@ -2128,8 +2139,8 @@ class _InfoPage extends StatelessWidget {
             child: Text(
               about
                   ? (s.isZh
-                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.25。'
-                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.25.')
+                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.26。'
+                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.26.')
                   : (s.isZh
                         ? '如需反馈，请在 GitHub 项目中提交 issue，并附上设备型号、系统版本和问题截图。'
                         : 'For feedback, open a GitHub issue with your device model, OS version, and screenshots.'),
@@ -3696,7 +3707,7 @@ class _SettingsList extends StatelessWidget {
       _SettingsRow(
         Icons.info_outline,
         s.isZh ? '关于 InkSplash' : 'About InkSplash',
-        'v1.0.25',
+        'v1.0.26',
         () => Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => const _InfoPage(kind: _InfoPageKind.about),

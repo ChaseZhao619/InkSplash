@@ -706,6 +706,11 @@ class AppController extends ChangeNotifier {
     );
   }
 
+  Future<void> connectScannedSoftApDevice(AppStrings s) async {
+    final payload = requireQr(s);
+    await connectProvisioningDevice(s, _softApFallbackDevice(s, payload));
+  }
+
   Future<void> provisionAndClaim(AppStrings s) async {
     final payload = requireQr(s);
     final token = requireLogin(s);
