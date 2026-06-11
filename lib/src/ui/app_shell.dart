@@ -1572,23 +1572,33 @@ class _AddDevicePage extends StatelessWidget {
                             : s.noProvisioningDevicesFound,
                       ),
                     ],
-                    if (controller.wifiNetworks.isNotEmpty) ...[
+                    if (controller.provisioningConnected) ...[
                       const SizedBox(height: 16),
                       _StepHeader(index: 3, text: s.wifiNetwork),
-                      DropdownButtonFormField<WifiNetwork>(
-                        initialValue: controller.selectedWifi,
-                        items: [
-                          for (final network in controller.wifiNetworks)
-                            DropdownMenuItem(
-                              value: network,
-                              child: Text(
-                                '${network.ssid}${network.rssi == null ? '' : ' (${network.rssi} dBm)'}',
-                                overflow: TextOverflow.ellipsis,
+                      if (controller.wifiNetworks.isNotEmpty) ...[
+                        DropdownButtonFormField<WifiNetwork>(
+                          initialValue: controller.selectedWifi,
+                          items: [
+                            for (final network in controller.wifiNetworks)
+                              DropdownMenuItem(
+                                value: network,
+                                child: Text(
+                                  '${network.ssid}${network.rssi == null ? '' : ' (${network.rssi} dBm)'}',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                        ],
-                        onChanged: controller.selectWifi,
-                        decoration: InputDecoration(labelText: s.wifiNetwork),
+                          ],
+                          onChanged: controller.selectWifi,
+                          decoration: InputDecoration(labelText: s.wifiNetwork),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      InkTextField(
+                        controller: controller.wifiNameController,
+                        labelText: s.isZh
+                            ? 'Wi-Fi 名称（SSID）'
+                            : 'Wi-Fi name (SSID)',
+                        prefixIcon: Icons.wifi_outlined,
                       ),
                       const SizedBox(height: 10),
                       InkTextField(
@@ -2139,8 +2149,8 @@ class _InfoPage extends StatelessWidget {
             child: Text(
               about
                   ? (s.isZh
-                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.26。'
-                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.26.')
+                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.27。'
+                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.27.')
                   : (s.isZh
                         ? '如需反馈，请在 GitHub 项目中提交 issue，并附上设备型号、系统版本和问题截图。'
                         : 'For feedback, open a GitHub issue with your device model, OS version, and screenshots.'),
@@ -3707,7 +3717,7 @@ class _SettingsList extends StatelessWidget {
       _SettingsRow(
         Icons.info_outline,
         s.isZh ? '关于 InkSplash' : 'About InkSplash',
-        'v1.0.26',
+        'v1.0.27',
         () => Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => const _InfoPage(kind: _InfoPageKind.about),

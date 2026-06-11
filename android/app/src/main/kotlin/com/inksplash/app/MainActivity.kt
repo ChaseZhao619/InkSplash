@@ -14,6 +14,7 @@ import com.espressif.provisioning.ESPProvisionManager
 import com.espressif.provisioning.WiFiAccessPoint
 import com.espressif.provisioning.listeners.BleScanListener
 import com.espressif.provisioning.listeners.ProvisionListener
+import com.espressif.provisioning.listeners.ResponseListener
 import com.espressif.provisioning.listeners.WiFiScanListener
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -286,16 +287,47 @@ class MainActivity : FlutterActivity() {
         if (accessPoint != null) {
             provisionManager.espDevice.setWifiDevice(accessPoint)
         }
-        pendingConnectResult = result
+        var completed = false
+        fun completeSuccess() {
+            if (completed) return
+            completed = true
+            result.success(null)
+        }
+        fun completeError(code: String, message: String) {
+            if (completed) return
+            completed = true
+            result.error(code, message, null)
+        }
+        fun initSoftApSession() {
+            provisionManager.espDevice.initSession(object : ResponseListener {
+                override fun onSuccess(returnData: ByteArray?) {
+                    completeSuccess()
+                }
+
+                override fun onFailure(e: Exception) {
+                    completeError(
+                        "session_failed",
+                        e.message ?: "Could not open ESP SoftAP provisioning session"
+                    )
+                }
+            })
+        }
         if (password.isEmpty()) {
+            // When the user has already joined the SoftAP in system Wi-Fi
+            // settings, the SDK's Wi-Fi connection event may never fire.
+            // Opening the provisioning session is the real readiness check.
             provisionManager.espDevice.connectWiFiDevice()
+            handler.postDelayed({ initSoftApSession() }, 1000)
         } else {
             provisionManager.espDevice.connectWiFiDevice(name, password)
+            handler.postDelayed({ initSoftApSession() }, 4000)
         }
         handler.postDelayed({
-            pendingConnectResult?.let {
-                pendingConnectResult = null
-                it.error("connect_timeout", "Timed out while connecting to ESP SoftAP device", null)
+            if (!completed) {
+                completeError(
+                    "connect_timeout",
+                    "Timed out while opening ESP SoftAP provisioning session"
+                )
             }
         }, 30000)
     }

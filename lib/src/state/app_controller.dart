@@ -36,6 +36,7 @@ class AppController extends ChangeNotifier {
   final passwordController = TextEditingController();
   final deviceNicknameController = TextEditingController();
   final renameController = TextEditingController();
+  final wifiNameController = TextEditingController();
   final wifiPasswordController = TextEditingController();
   final softApPasswordController = TextEditingController();
   final verifyEmailTokenController = TextEditingController();
@@ -61,6 +62,7 @@ class AppController extends ChangeNotifier {
   List<WifiNetwork> wifiNetworks = const [];
   String provisioningTransport = 'ble';
   bool provisioningSearchAttempted = false;
+  bool provisioningConnected = false;
   List<AppDevice> devices = const [];
   AppDevice? selectedDevice;
   WifiNetwork? selectedWifi;
@@ -592,6 +594,7 @@ class AppController extends ChangeNotifier {
       qrPayload = payload;
       provisioningTransport = payload.isSoftAp ? 'softap' : 'ble';
       provisioningSearchAttempted = false;
+      provisioningConnected = false;
       softApPasswordController.text = payload.softApPassword ?? '';
       provisioningDevices = payload.isSoftAp
           ? [_softApFallbackDevice(s, payload)]
@@ -699,9 +702,13 @@ class AppController extends ChangeNotifier {
             security: payload.security,
           );
         }
-        final networks = await _provisioning.scanWifiNetworks();
+        final networks = await _provisioning.scanWifiNetworks().catchError(
+          (_) => <WifiNetwork>[],
+        );
         wifiNetworks = networks;
         selectedWifi = networks.isEmpty ? null : networks.first;
+        wifiNameController.text = selectedWifi?.ssid ?? '';
+        provisioningConnected = true;
       },
     );
   }
@@ -714,13 +721,13 @@ class AppController extends ChangeNotifier {
   Future<void> provisionAndClaim(AppStrings s) async {
     final payload = requireQr(s);
     final token = requireLogin(s);
-    final wifi = selectedWifi;
-    if (wifi == null) {
+    final ssid = wifiNameController.text.trim();
+    if (ssid.isEmpty) {
       throw ApiError(s.selectWifiFirst);
     }
     await runAction(s, s.provisionClaimAction, () async {
       await _provisioning.provisionWifi(
-        ssid: wifi.ssid,
+        ssid: ssid,
         password: wifiPasswordController.text,
       );
       if (provisioningTransport == 'softap') {
@@ -1166,6 +1173,7 @@ class AppController extends ChangeNotifier {
     wifiNetworks = const [];
     selectedWifi = null;
     provisioningSearchAttempted = false;
+    provisioningConnected = false;
     notifyListeners();
   }
 
@@ -1178,6 +1186,7 @@ class AppController extends ChangeNotifier {
 
   void selectWifi(WifiNetwork? value) {
     selectedWifi = value;
+    wifiNameController.text = value?.ssid ?? '';
     notifyListeners();
   }
 
@@ -1502,6 +1511,7 @@ class AppController extends ChangeNotifier {
     passwordController.dispose();
     deviceNicknameController.dispose();
     renameController.dispose();
+    wifiNameController.dispose();
     wifiPasswordController.dispose();
     softApPasswordController.dispose();
     verifyEmailTokenController.dispose();
