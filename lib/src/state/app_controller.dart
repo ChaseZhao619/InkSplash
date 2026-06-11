@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart' hide ImageInfo;
+import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
@@ -63,6 +63,12 @@ class AppController extends ChangeNotifier {
   String provisioningTransport = 'ble';
   bool provisioningSearchAttempted = false;
   bool provisioningConnected = false;
+  bool provisioningDiagnosticsExpanded = false;
+  bool? provisioningPermissionGranted;
+  String provisioningLastStep = '';
+  String? provisioningLastError;
+  int provisioningScannedDeviceCount = 0;
+  int provisioningScannedWifiCount = 0;
   List<AppDevice> devices = const [];
   AppDevice? selectedDevice;
   WifiNetwork? selectedWifi;
@@ -159,6 +165,7 @@ class AppController extends ChangeNotifier {
       await task();
       message = s.completed(action);
     } catch (error) {
+      provisioningLastError = _provisioningErrorDetail(error);
       message = s.failed(action, error);
     } finally {
       busy = false;
@@ -595,6 +602,11 @@ class AppController extends ChangeNotifier {
       provisioningTransport = payload.isSoftAp ? 'softap' : 'ble';
       provisioningSearchAttempted = false;
       provisioningConnected = false;
+      provisioningPermissionGranted = null;
+      provisioningLastStep = 'qr:${payload.transport}';
+      provisioningLastError = null;
+      provisioningScannedDeviceCount = 0;
+      provisioningScannedWifiCount = 0;
       softApPasswordController.text = payload.softApPassword ?? '';
       provisioningDevices = payload.isSoftAp
           ? [_softApFallbackDevice(s, payload)]
@@ -604,6 +616,8 @@ class AppController extends ChangeNotifier {
       message = s.completed(s.scanDeviceQr);
     } catch (error) {
       final detail = error is FormatException ? error.message : '$error';
+      provisioningLastStep = 'qr:error';
+      provisioningLastError = detail;
       message = '${s.invalidQrPayload}: $detail';
     }
     notifyListeners();
@@ -616,10 +630,14 @@ class AppController extends ChangeNotifier {
       s,
       useSoftAp ? s.softApSearchAction : s.bleSearchAction,
       () async {
+        _setProvisioningStep('permission');
         final granted = await _provisioning.requestPermissions();
+        provisioningPermissionGranted = granted;
         if (!granted) {
+          provisioningLastError = s.provisioningPermissionDenied;
           throw ApiError(s.provisioningPermissionDenied);
         }
+        _setProvisioningStep(useSoftAp ? 'softap:search' : 'ble:search');
         List<ProvisioningDevice> devices;
         try {
           final search = useSoftAp
@@ -646,11 +664,15 @@ class AppController extends ChangeNotifier {
         provisioningDevices = useSoftAp
             ? _withSoftApFallback(s, payload, devices)
             : devices;
+        provisioningScannedDeviceCount = provisioningDevices.length;
+        _setProvisioningStep(useSoftAp ? 'softap:searched' : 'ble:searched');
         if (devices.isEmpty) {
           if (useSoftAp) {
             provisioningDevices = [_softApFallbackDevice(s, payload)];
+            provisioningScannedDeviceCount = provisioningDevices.length;
             return;
           }
+          provisioningLastError = s.noProvisioningDevicesFound;
           throw ApiError(s.noProvisioningDevicesFound);
         }
       },
@@ -688,6 +710,7 @@ class AppController extends ChangeNotifier {
       s,
       useSoftAp ? s.softApConnectAction : s.bleConnectAction,
       () async {
+        _setProvisioningStep(useSoftAp ? 'softap:connect' : 'ble:connect');
         if (useSoftAp) {
           await _provisioning.connectSoftApDevice(
             name: device.name,
@@ -702,13 +725,19 @@ class AppController extends ChangeNotifier {
             security: payload.security,
           );
         }
-        final networks = await _provisioning.scanWifiNetworks().catchError(
-          (_) => <WifiNetwork>[],
-        );
+        _setProvisioningStep('wifi:scan');
+        final networks = await _provisioning.scanWifiNetworks().catchError((
+          Object error,
+        ) {
+          provisioningLastError = _provisioningErrorDetail(error);
+          return <WifiNetwork>[];
+        });
         wifiNetworks = networks;
         selectedWifi = networks.isEmpty ? null : networks.first;
         wifiNameController.text = selectedWifi?.ssid ?? '';
         provisioningConnected = true;
+        provisioningScannedWifiCount = networks.length;
+        _setProvisioningStep('wifi:ready', clearError: false);
       },
     );
   }
@@ -723,9 +752,11 @@ class AppController extends ChangeNotifier {
     final token = requireLogin(s);
     final ssid = wifiNameController.text.trim();
     if (ssid.isEmpty) {
+      provisioningLastError = s.selectWifiFirst;
       throw ApiError(s.selectWifiFirst);
     }
     await runAction(s, s.provisionClaimAction, () async {
+      _setProvisioningStep('wifi:provision');
       await _provisioning.provisionWifi(
         ssid: ssid,
         password: wifiPasswordController.text,
@@ -744,6 +775,7 @@ class AppController extends ChangeNotifier {
         (device) => device.deviceId == claimed.deviceId,
         orElse: () => claimed,
       );
+      _setProvisioningStep('claim:done');
     });
   }
 
@@ -755,6 +787,25 @@ class AppController extends ChangeNotifier {
       // continue as long as Android releases the SoftAP network binding.
     }
     await Future<void>.delayed(const Duration(seconds: 3));
+  }
+
+  void _setProvisioningStep(String step, {bool clearError = true}) {
+    provisioningLastStep = step;
+    if (clearError) {
+      provisioningLastError = null;
+    }
+  }
+
+  String _provisioningErrorDetail(Object error) {
+    if (error is PlatformException) {
+      final message = error.message?.trim();
+      return message == null || message.isEmpty
+          ? error.code
+          : '${error.code}: $message';
+    }
+    return '$error'
+        .replaceFirst(RegExp(r'^[A-Za-z]+Exception:\s*'), '')
+        .replaceFirst(RegExp(r'^ApiError:\s*'), '');
   }
 
   Future<AppDevice> _claimDeviceWithNetworkRetry({
@@ -1174,6 +1225,15 @@ class AppController extends ChangeNotifier {
     selectedWifi = null;
     provisioningSearchAttempted = false;
     provisioningConnected = false;
+    provisioningLastStep = 'transport:$transport';
+    provisioningLastError = null;
+    provisioningScannedDeviceCount = provisioningDevices.length;
+    provisioningScannedWifiCount = 0;
+    notifyListeners();
+  }
+
+  void setProvisioningDiagnosticsExpanded(bool value) {
+    provisioningDiagnosticsExpanded = value;
     notifyListeners();
   }
 

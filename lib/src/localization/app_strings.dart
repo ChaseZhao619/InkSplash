@@ -237,6 +237,14 @@ class AppStrings {
           ? '登录凭证无效，请重新登录。'
           : 'Sign-in credential is invalid. Sign in again.';
     }
+    final platform = RegExp(
+      r'^PlatformException\(([^,]+),\s*([^,)]*)',
+    ).firstMatch(raw);
+    if (platform != null) {
+      final code = platform.group(1)?.trim() ?? '';
+      final message = platform.group(2)?.trim() ?? '';
+      return message.isEmpty ? code : '$code: $message';
+    }
     return raw
         .replaceFirst(RegExp(r'^[A-Za-z]+Exception:\s*'), '')
         .replaceFirst(RegExp(r'^ApiError:\s*'), '');

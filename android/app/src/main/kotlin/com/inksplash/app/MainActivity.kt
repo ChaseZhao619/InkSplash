@@ -298,17 +298,22 @@ class MainActivity : FlutterActivity() {
             completed = true
             result.error(code, message, null)
         }
-        fun initSoftApSession() {
+        fun initSoftApSession(attemptsLeft: Int) {
+            if (completed) return
             provisionManager.espDevice.initSession(object : ResponseListener {
                 override fun onSuccess(returnData: ByteArray?) {
                     completeSuccess()
                 }
 
                 override fun onFailure(e: Exception) {
-                    completeError(
-                        "session_failed",
-                        e.message ?: "Could not open ESP SoftAP provisioning session"
-                    )
+                    if (attemptsLeft <= 1) {
+                        completeError(
+                            "session_failed",
+                            e.message ?: "Could not open ESP SoftAP provisioning session"
+                        )
+                    } else {
+                        handler.postDelayed({ initSoftApSession(attemptsLeft - 1) }, 2000)
+                    }
                 }
             })
         }
@@ -317,10 +322,10 @@ class MainActivity : FlutterActivity() {
             // settings, the SDK's Wi-Fi connection event may never fire.
             // Opening the provisioning session is the real readiness check.
             provisionManager.espDevice.connectWiFiDevice()
-            handler.postDelayed({ initSoftApSession() }, 1000)
+            handler.postDelayed({ initSoftApSession(15) }, 1000)
         } else {
             provisionManager.espDevice.connectWiFiDevice(name, password)
-            handler.postDelayed({ initSoftApSession() }, 4000)
+            handler.postDelayed({ initSoftApSession(13) }, 4000)
         }
         handler.postDelayed({
             if (!completed) {
