@@ -1467,7 +1467,7 @@ class _AddDevicePage extends StatelessWidget {
                         ],
                         selected: {controller.provisioningTransport},
                         onSelectionChanged: (selection) => controller
-                            .selectProvisioningTransport(selection.first),
+                            .selectProvisioningTransport(s, selection.first),
                       ),
                       const SizedBox(height: 12),
                       InkTextField(
@@ -1540,9 +1540,9 @@ class _AddDevicePage extends StatelessWidget {
                         subtitle: device.serviceUuid ?? s.noServiceUuid,
                         onTap: () =>
                             controller.connectProvisioningDevice(s, device),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.link),
-                          tooltip: s.connect,
+                        trailing: FilledButton.icon(
+                          icon: const Icon(Icons.link, size: 18),
+                          label: Text(s.connect),
                           onPressed: () =>
                               controller.connectProvisioningDevice(s, device),
                         ),
@@ -2128,8 +2128,8 @@ class _InfoPage extends StatelessWidget {
             child: Text(
               about
                   ? (s.isZh
-                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.24。'
-                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.24.')
+                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.25。'
+                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.25.')
                   : (s.isZh
                         ? '如需反馈，请在 GitHub 项目中提交 issue，并附上设备型号、系统版本和问题截图。'
                         : 'For feedback, open a GitHub issue with your device model, OS version, and screenshots.'),
@@ -3696,7 +3696,7 @@ class _SettingsList extends StatelessWidget {
       _SettingsRow(
         Icons.info_outline,
         s.isZh ? '关于 InkSplash' : 'About InkSplash',
-        'v1.0.24',
+        'v1.0.25',
         () => Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => const _InfoPage(kind: _InfoPageKind.about),

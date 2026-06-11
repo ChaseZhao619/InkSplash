@@ -593,7 +593,9 @@ class AppController extends ChangeNotifier {
       provisioningTransport = payload.isSoftAp ? 'softap' : 'ble';
       provisioningSearchAttempted = false;
       softApPasswordController.text = payload.softApPassword ?? '';
-      provisioningDevices = const [];
+      provisioningDevices = payload.isSoftAp
+          ? [_softApFallbackDevice(s, payload)]
+          : const [];
       wifiNetworks = const [];
       selectedWifi = null;
       message = s.completed(s.scanDeviceQr);
@@ -638,7 +640,9 @@ class AppController extends ChangeNotifier {
           devices = [_softApFallbackDevice(s, payload)];
         }
         provisioningSearchAttempted = true;
-        provisioningDevices = devices;
+        provisioningDevices = useSoftAp
+            ? _withSoftApFallback(s, payload, devices)
+            : devices;
         if (devices.isEmpty) {
           if (useSoftAp) {
             provisioningDevices = [_softApFallbackDevice(s, payload)];
@@ -658,6 +662,17 @@ class AppController extends ChangeNotifier {
       name: payload.name,
       serviceUuid: s.softApManualFallback,
     );
+  }
+
+  List<ProvisioningDevice> _withSoftApFallback(
+    AppStrings s,
+    ProvisioningQrPayload payload,
+    List<ProvisioningDevice> devices,
+  ) {
+    if (devices.any((device) => device.name == payload.name)) {
+      return devices;
+    }
+    return [_softApFallbackDevice(s, payload), ...devices];
   }
 
   Future<void> connectProvisioningDevice(
@@ -1134,12 +1149,15 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void selectProvisioningTransport(String transport) {
+  void selectProvisioningTransport(AppStrings s, String transport) {
     if (transport != 'ble' && transport != 'softap') {
       return;
     }
     provisioningTransport = transport;
-    provisioningDevices = const [];
+    final payload = qrPayload;
+    provisioningDevices = transport == 'softap' && payload != null
+        ? [_softApFallbackDevice(s, payload)]
+        : const [];
     wifiNetworks = const [];
     selectedWifi = null;
     provisioningSearchAttempted = false;
