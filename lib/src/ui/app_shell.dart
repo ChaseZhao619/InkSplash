@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart' hide ImageInfo;
@@ -2077,8 +2078,8 @@ class _InfoPage extends StatelessWidget {
             child: Text(
               about
                   ? (s.isZh
-                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.21。'
-                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.21.')
+                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.22。'
+                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.22.')
                   : (s.isZh
                         ? '如需反馈，请在 GitHub 项目中提交 issue，并附上设备型号、系统版本和问题截图。'
                         : 'For feedback, open a GitHub issue with your device model, OS version, and screenshots.'),
@@ -2118,11 +2119,18 @@ class _QrScannerPageState extends State<QrScannerPage> {
           if (_handled) {
             return;
           }
-          final raw = capture.barcodes.firstOrNull?.rawValue;
-          if (raw != null && raw.isNotEmpty) {
+          String? raw;
+          for (final barcode in capture.barcodes) {
+            final value = barcode.rawValue?.trim();
+            if (value != null && value.isNotEmpty) {
+              raw = value;
+              break;
+            }
+          }
+          if (raw != null) {
             _handled = true;
-            _controller.stop();
-            Navigator.of(context).maybePop(raw);
+            unawaited(_controller.stop());
+            Navigator.of(context).pop(raw);
           }
         },
       ),
@@ -3638,7 +3646,7 @@ class _SettingsList extends StatelessWidget {
       _SettingsRow(
         Icons.info_outline,
         s.isZh ? '关于 InkSplash' : 'About InkSplash',
-        'v1.0.21',
+        'v1.0.22',
         () => Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => const _InfoPage(kind: _InfoPageKind.about),
