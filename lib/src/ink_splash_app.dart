@@ -58,6 +58,15 @@ class _InkSplashAppState extends State<InkSplashApp> {
         GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
       ],
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        return MediaQuery(
+          data: media.copyWith(
+            textScaler: media.textScaler.clamp(maxScaleFactor: 1.15),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: AppShell(language: _language, onLanguageChanged: _setLanguage),
     );
   }

@@ -59,6 +59,8 @@ class AppController extends ChangeNotifier {
   ProvisioningQrPayload? qrPayload;
   List<ProvisioningDevice> provisioningDevices = const [];
   List<WifiNetwork> wifiNetworks = const [];
+  String provisioningTransport = 'ble';
+  bool provisioningSearchAttempted = false;
   List<AppDevice> devices = const [];
   AppDevice? selectedDevice;
   WifiNetwork? selectedWifi;
@@ -588,6 +590,8 @@ class AppController extends ChangeNotifier {
     try {
       final payload = ProvisioningQrPayload.fromRaw(raw);
       qrPayload = payload;
+      provisioningTransport = payload.isSoftAp ? 'softap' : 'ble';
+      provisioningSearchAttempted = false;
       softApPasswordController.text = payload.softApPassword ?? '';
       provisioningDevices = const [];
       wifiNetworks = const [];
@@ -602,9 +606,10 @@ class AppController extends ChangeNotifier {
 
   Future<void> searchProvisioningDevice(AppStrings s) async {
     final payload = requireQr(s);
+    final useSoftAp = provisioningTransport == 'softap';
     await runAction(
       s,
-      payload.isSoftAp ? s.softApSearchAction : s.bleSearchAction,
+      useSoftAp ? s.softApSearchAction : s.bleSearchAction,
       () async {
         final granted = await _provisioning.requestPermissions();
         if (!granted) {
@@ -612,7 +617,7 @@ class AppController extends ChangeNotifier {
         }
         List<ProvisioningDevice> devices;
         try {
-          final search = payload.isSoftAp
+          final search = useSoftAp
               ? _provisioning.searchSoftApDevices(
                   prefix: payload.devicePrefix,
                   name: payload.name,
@@ -626,14 +631,16 @@ class AppController extends ChangeNotifier {
             ),
           );
         } catch (_) {
-          if (!payload.isSoftAp) {
+          provisioningSearchAttempted = true;
+          if (!useSoftAp) {
             rethrow;
           }
           devices = [_softApFallbackDevice(s, payload)];
         }
+        provisioningSearchAttempted = true;
         provisioningDevices = devices;
         if (devices.isEmpty) {
-          if (payload.isSoftAp) {
+          if (useSoftAp) {
             provisioningDevices = [_softApFallbackDevice(s, payload)];
             return;
           }
@@ -658,11 +665,12 @@ class AppController extends ChangeNotifier {
     ProvisioningDevice device,
   ) async {
     final payload = requireQr(s);
+    final useSoftAp = provisioningTransport == 'softap';
     await runAction(
       s,
-      payload.isSoftAp ? s.softApConnectAction : s.bleConnectAction,
+      useSoftAp ? s.softApConnectAction : s.bleConnectAction,
       () async {
-        if (payload.isSoftAp) {
+        if (useSoftAp) {
           await _provisioning.connectSoftApDevice(
             name: device.name,
             proofOfPossession: payload.proofOfPossession,
@@ -695,7 +703,7 @@ class AppController extends ChangeNotifier {
         ssid: wifi.ssid,
         password: wifiPasswordController.text,
       );
-      if (payload.isSoftAp) {
+      if (provisioningTransport == 'softap') {
         await _releaseSoftApNetwork();
       }
       final claimed = await _claimDeviceWithNetworkRetry(
@@ -1123,6 +1131,18 @@ class AppController extends ChangeNotifier {
     renameController.text = device.nickname ?? '';
     members = const [];
     statusEvents = const [];
+    notifyListeners();
+  }
+
+  void selectProvisioningTransport(String transport) {
+    if (transport != 'ble' && transport != 'softap') {
+      return;
+    }
+    provisioningTransport = transport;
+    provisioningDevices = const [];
+    wifiNetworks = const [];
+    selectedWifi = null;
+    provisioningSearchAttempted = false;
     notifyListeners();
   }
 

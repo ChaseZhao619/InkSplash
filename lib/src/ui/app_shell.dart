@@ -1407,6 +1407,7 @@ class _AddDevicePage extends StatelessWidget {
         final s = AppStrings.of(context);
         final payload = controller.qrPayload;
         final media = MediaQuery.of(context);
+        final useSoftAp = controller.provisioningTransport == 'softap';
 
         return MediaQuery(
           data: media.copyWith(
@@ -1445,11 +1446,29 @@ class _AddDevicePage extends StatelessWidget {
                       const SizedBox(height: 16),
                       _StepHeader(index: 1, text: s.scanDeviceQr),
                       _KeyValue(
-                        label: payload.isSoftAp ? s.softApName : s.bleName,
+                        label: useSoftAp ? s.softApName : s.bleName,
                         value: payload.name,
                       ),
                       _KeyValue(label: s.deviceId, value: payload.deviceId),
                       _KeyValue(label: s.transport, value: payload.transport),
+                      const SizedBox(height: 10),
+                      SegmentedButton<String>(
+                        segments: [
+                          ButtonSegment(
+                            value: 'ble',
+                            icon: const Icon(Icons.bluetooth),
+                            label: Text(s.isZh ? 'BLE' : 'BLE'),
+                          ),
+                          ButtonSegment(
+                            value: 'softap',
+                            icon: const Icon(Icons.wifi_tethering),
+                            label: Text(s.isZh ? 'SoftAP' : 'SoftAP'),
+                          ),
+                        ],
+                        selected: {controller.provisioningTransport},
+                        onSelectionChanged: (selection) => controller
+                            .selectProvisioningTransport(selection.first),
+                      ),
                       const SizedBox(height: 12),
                       InkTextField(
                         controller: controller.deviceNicknameController,
@@ -1459,11 +1478,11 @@ class _AddDevicePage extends StatelessWidget {
                       const SizedBox(height: 16),
                       _StepHeader(
                         index: 2,
-                        text: payload.isSoftAp
+                        text: useSoftAp
                             ? s.searchSoftApDevice
                             : s.searchBleDevice,
                       ),
-                      if (payload.isSoftAp) ...[
+                      if (useSoftAp) ...[
                         Text(
                           s.softApHint,
                           style: Theme.of(context).textTheme.bodySmall,
@@ -1481,12 +1500,12 @@ class _AddDevicePage extends StatelessWidget {
                       OutlinedButton.icon(
                         onPressed: () => controller.searchProvisioningDevice(s),
                         icon: Icon(
-                          payload.isSoftAp
+                          useSoftAp
                               ? Icons.wifi_tethering
                               : Icons.bluetooth_searching,
                         ),
                         label: Text(
-                          payload.isSoftAp
+                          useSoftAp
                               ? s.searchSoftApDevice
                               : s.searchBleDevice,
                         ),
@@ -1501,7 +1520,12 @@ class _AddDevicePage extends StatelessWidget {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             ),
                             const SizedBox(width: 10),
-                            Expanded(child: Text(s.searchingDevices)),
+                            Expanded(
+                              child: Text(
+                                s.searchingDevices,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -1509,17 +1533,32 @@ class _AddDevicePage extends StatelessWidget {
                     for (final device in controller.provisioningDevices) ...[
                       const SizedBox(height: 8),
                       InkIconTile(
-                        icon: payload?.isSoftAp == true
+                        icon: useSoftAp
                             ? Icons.wifi
                             : Icons.bluetooth,
                         title: device.name,
                         subtitle: device.serviceUuid ?? s.noServiceUuid,
+                        onTap: () =>
+                            controller.connectProvisioningDevice(s, device),
                         trailing: IconButton(
                           icon: const Icon(Icons.link),
                           tooltip: s.connect,
                           onPressed: () =>
                               controller.connectProvisioningDevice(s, device),
                         ),
+                      ),
+                    ],
+                    if (!controller.busy &&
+                        controller.provisioningSearchAttempted &&
+                        controller.provisioningDevices.isEmpty) ...[
+                      const SizedBox(height: 10),
+                      _EmptyState(
+                        icon: useSoftAp
+                            ? Icons.wifi_off_outlined
+                            : Icons.bluetooth_disabled_outlined,
+                        text: useSoftAp
+                            ? s.softApManualFallback
+                            : s.noProvisioningDevicesFound,
                       ),
                     ],
                     if (controller.wifiNetworks.isNotEmpty) ...[
@@ -2089,8 +2128,8 @@ class _InfoPage extends StatelessWidget {
             child: Text(
               about
                   ? (s.isZh
-                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.23。'
-                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.23.')
+                        ? 'InkSplash 是为六色电子墨水屏设计的家庭相册 App。当前版本 v1.0.24。'
+                        : 'InkSplash is a family album app for six-color e-ink frames. Current version v1.0.24.')
                   : (s.isZh
                         ? '如需反馈，请在 GitHub 项目中提交 issue，并附上设备型号、系统版本和问题截图。'
                         : 'For feedback, open a GitHub issue with your device model, OS version, and screenshots.'),
@@ -3657,7 +3696,7 @@ class _SettingsList extends StatelessWidget {
       _SettingsRow(
         Icons.info_outline,
         s.isZh ? '关于 InkSplash' : 'About InkSplash',
-        'v1.0.23',
+        'v1.0.24',
         () => Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => const _InfoPage(kind: _InfoPageKind.about),
@@ -3845,7 +3884,11 @@ class _EmptyState extends StatelessWidget {
             Text(
               text,
               textAlign: TextAlign.center,
-              style: TextStyle(color: colors.onSurface.withValues(alpha: 0.62)),
+              style: TextStyle(
+                color: colors.onSurface.withValues(alpha: 0.62),
+                fontSize: 14,
+                height: 1.35,
+              ),
             ),
           ],
         ),
